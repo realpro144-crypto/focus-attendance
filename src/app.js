@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import QRCode from "qrcode";
 
 const AUTH_STORAGE_KEY = "focusAttendanceSession";
+const SAVED_LOGIN_STORAGE_KEY = "focusAttendanceSavedLogin";
 const colors = ["#0f766e", "#2563eb", "#9333ea", "#d97706", "#db2777", "#16a34a", "#475569", "#dc2626"];
 
 let app = null;
@@ -26,6 +27,7 @@ let state = {
   employeeFilter: "all",
   authMode: "login",
   auth: { status: "checking", token: "", employee: null },
+  savedLogin: { employeeNo: "", password: "", rememberCredentials: false, autoLogin: false },
   scannerStatus: "idle",
   scannerError: "",
   pendingQrCode: "",
@@ -121,6 +123,47 @@ function employeeColor(employeeId) {
 
 function employeeNoLabel(value) {
   return value ? value : "사번 미등록";
+}
+
+function defaultSavedLogin() {
+  return { employeeNo: "", password: "", rememberCredentials: false, autoLogin: false };
+}
+
+function readSavedLogin() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SAVED_LOGIN_STORAGE_KEY) || "{}");
+    return {
+      employeeNo: typeof saved.employeeNo === "string" ? saved.employeeNo : "",
+      password: typeof saved.password === "string" ? saved.password : "",
+      rememberCredentials: Boolean(saved.rememberCredentials),
+      autoLogin: Boolean(saved.autoLogin)
+    };
+  } catch {
+    return defaultSavedLogin();
+  }
+}
+
+function writeSavedLogin({ employeeNo = "", password = "", rememberCredentials = false, autoLogin = false }) {
+  const shouldRemember = Boolean(rememberCredentials || autoLogin);
+  if (!shouldRemember) {
+    localStorage.removeItem(SAVED_LOGIN_STORAGE_KEY);
+    return defaultSavedLogin();
+  }
+
+  const saved = {
+    employeeNo: String(employeeNo).trim(),
+    password: String(password),
+    rememberCredentials: true,
+    autoLogin: Boolean(autoLogin)
+  };
+  localStorage.setItem(SAVED_LOGIN_STORAGE_KEY, JSON.stringify(saved));
+  return saved;
+}
+
+function disableSavedAutoLogin() {
+  const saved = { ...state.savedLogin, autoLogin: false };
+  localStorage.setItem(SAVED_LOGIN_STORAGE_KEY, JSON.stringify(saved));
+  state.savedLogin = saved;
 }
 
 function activeEmployees() {
@@ -223,8 +266,23 @@ async function loadState({ keepCheckIn = false } = {}) {
 }
 
 async function loadAuth() {
+  state.savedLogin = readSavedLogin();
   const token = localStorage.getItem(AUTH_STORAGE_KEY);
   if (!token) {
+    if (state.savedLogin.autoLogin && state.savedLogin.employeeNo && state.savedLogin.password) {
+      state.auth = { status: "checking", token: "", employee: null };
+      try {
+        const result = await callRpc("login_employee", {
+          employee_no_input: state.savedLogin.employeeNo,
+          password_input: state.savedLogin.password
+        });
+        saveSession(result.token, result.employee, { persist: true });
+        return;
+      } catch {
+        disableSavedAutoLogin();
+      }
+    }
+
     state.auth = { status: "anonymous", token: "", employee: null };
     return;
   }
@@ -239,8 +297,9 @@ async function loadAuth() {
   }
 }
 
-function saveSession(token, employee) {
-  localStorage.setItem(AUTH_STORAGE_KEY, token);
+function saveSession(token, employee, { persist = false } = {}) {
+  if (persist) localStorage.setItem(AUTH_STORAGE_KEY, token);
+  else localStorage.removeItem(AUTH_STORAGE_KEY);
   state.auth = { status: "authenticated", token, employee };
 }
 
@@ -260,10 +319,7 @@ function renderTopbar() {
   const todayLabel = state.today?.dateKey ? formatFullDate(state.today.dateKey) : "";
   const checkinActions =
     route() === "checkin"
-      ? `
-        ${state.auth.employee ? `<button class="btn secondary" data-action="logout">계정 변경</button>` : ""}
-        <a class="btn secondary" href="/dashboard">관리 화면</a>
-      `
+      ? `${state.auth.employee ? `<button class="btn secondary" data-action="logout">계정 변경</button>` : ""}`
       : `<button class="btn secondary" data-action="refresh">새로고침</button>`;
 
   return `
@@ -521,6 +577,7 @@ function renderDashboard() {
 
 function renderAuthPanel() {
   const isRegister = state.authMode === "register";
+  const saved = state.savedLogin;
   return `
     <div class="checkin-form">
       <div class="segmented" role="tablist" aria-label="로그인 방식">
@@ -540,16 +597,57 @@ function renderAuthPanel() {
         }
         <label class="field">
           <span>사번</span>
-          <input class="input" name="employeeNo" autocomplete="username" inputmode="text" required />
+          <input class="input" name="employeeNo" autocomplete="username" inputmode="text" value="${
+            !isRegister ? escapeHtml(saved.employeeNo) : ""
+          }" required />
         </label>
         <label class="field">
           <span>비밀번호</span>
-          <input class="input" name="password" type="password" autocomplete="${isRegister ? "new-password" : "current-password"}" required />
+          <input class="input" name="password" type="password" autocomplete="${isRegister ? "new-password" : "current-password"}" value="${
+            !isRegister ? escapeHtml(saved.password) : ""
+          }" required />
         </label>
+        ${
+          isRegister
+            ? `
+              <label class="field">
+                <span>비밀번호 확인</span>
+                <input class="input" name="passwordConfirm" type="password" autocomplete="new-password" data-password-confirm aria-describedby="password-confirm-error" required />
+                <small id="password-confirm-error" class="field-error hidden" data-password-error>비밀번호가 일치하지 않습니다.</small>
+              </label>
+            `
+            : `
+              <div class="auth-options">
+                <label class="check-option">
+                  <input type="checkbox" name="rememberCredentials" data-login-option="remember" ${saved.rememberCredentials ? "checked" : ""} />
+                  <span>아이디/비밀번호 저장</span>
+                </label>
+                <label class="check-option">
+                  <input type="checkbox" name="autoLogin" data-login-option="auto" ${saved.autoLogin ? "checked" : ""} />
+                  <span>자동 로그인</span>
+                </label>
+              </div>
+            `
+        }
         <button class="btn primary" type="submit">${isRegister ? "등록" : "로그인"}</button>
       </form>
     </div>
   `;
+}
+
+function updatePasswordConfirmState(form, { showError = false } = {}) {
+  const passwordInput = form.elements.password;
+  const confirmInput = form.elements.passwordConfirm;
+  const error = form.querySelector("[data-password-error]");
+  if (!passwordInput || !confirmInput || !error) return true;
+
+  const mismatch = passwordInput.value !== confirmInput.value;
+  const shouldShow = showError && mismatch;
+
+  confirmInput.classList.toggle("invalid", shouldShow);
+  error.classList.toggle("hidden", !shouldShow);
+  confirmInput.setCustomValidity(mismatch ? "비밀번호가 일치하지 않습니다." : "");
+  return !mismatch;
 }
 
 function renderAccountLine() {
@@ -594,7 +692,7 @@ function renderScannerPanel() {
       <form class="manual-code-form" data-form="manual-qr">
         <label class="field">
           <span>수동 코드</span>
-          <input class="input" name="qrCode" autocomplete="off" placeholder="관리자 화면의 수동 코드" />
+          <input class="input" name="qrCode" autocomplete="off" placeholder="수동 코드를 입력해 주세요" />
         </label>
         <button class="btn secondary" type="submit">코드로 출근</button>
       </form>
@@ -940,6 +1038,16 @@ document.addEventListener("click", async (event) => {
 });
 
 document.addEventListener("change", async (event) => {
+  if (event.target.dataset.loginOption === "auto") {
+    const form = event.target.closest('form[data-form="login"]');
+    if (form && event.target.checked) form.elements.rememberCredentials.checked = true;
+  }
+
+  if (event.target.dataset.loginOption === "remember") {
+    const form = event.target.closest('form[data-form="login"]');
+    if (form && !event.target.checked) form.elements.autoLogin.checked = false;
+  }
+
   if (event.target.dataset.action === "employee-filter") {
     state.employeeFilter = event.target.value;
     renderDashboard();
@@ -952,10 +1060,23 @@ document.addEventListener("change", async (event) => {
   }
 });
 
+document.addEventListener("input", (event) => {
+  const form = event.target.closest('form[data-form="register"]');
+  if (!form || !["password", "passwordConfirm"].includes(event.target.name)) return;
+  updatePasswordConfirmState(form, { showError: Boolean(form.elements.passwordConfirm.value) });
+});
+
 document.addEventListener("submit", async (event) => {
   const form = event.target.closest("form[data-form]");
   if (!form) return;
   event.preventDefault();
+
+  if (form.dataset.form === "register" && !updatePasswordConfirmState(form, { showError: true })) {
+    form.elements.passwordConfirm.focus();
+    return;
+  }
+
+  if (!form.reportValidity()) return;
 
   const data = Object.fromEntries(new FormData(form).entries());
 
@@ -981,11 +1102,19 @@ document.addEventListener("submit", async (event) => {
     }
 
     if (form.dataset.form === "login") {
+      const rememberCredentials = data.rememberCredentials === "on";
+      const autoLogin = data.autoLogin === "on";
       const result = await callRpc("login_employee", {
         employee_no_input: data.employeeNo,
         password_input: data.password
       });
-      saveSession(result.token, result.employee);
+      state.savedLogin = writeSavedLogin({
+        employeeNo: data.employeeNo,
+        password: data.password,
+        rememberCredentials,
+        autoLogin
+      });
+      saveSession(result.token, result.employee, { persist: autoLogin });
       await loadState({ keepCheckIn: true });
       renderCheckin();
       await maybeCompleteCheckIn();

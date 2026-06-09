@@ -1,4 +1,5 @@
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.branch_settings (
   id boolean primary key default true check (id),
@@ -57,7 +58,7 @@ create or replace function public.get_public_state()
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   settings_row public.branch_settings;
@@ -119,7 +120,7 @@ create or replace function public.set_branch_name(branch_name_input text)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   clean_name text := trim(coalesce(branch_name_input, ''));
@@ -154,7 +155,7 @@ create or replace function public.register_employee(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   clean_name text := regexp_replace(trim(coalesce(name_input, '')), '\s+', ' ', 'g');
@@ -207,7 +208,7 @@ create or replace function public.login_employee(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   clean_no text := public.normalize_employee_no(employee_no_input);
