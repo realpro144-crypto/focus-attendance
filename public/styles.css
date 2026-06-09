@@ -327,6 +327,45 @@ button:disabled {
   background: #fff;
 }
 
+.employee-admin-list {
+  display: grid;
+  gap: 10px;
+}
+
+.employee-admin-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.employee-admin-main {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.employee-admin-actions,
+.password-reset-form {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-chip {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-style: normal;
+  vertical-align: 1px;
+}
+
 .dot {
   width: 10px;
   height: 10px;
@@ -430,6 +469,14 @@ button:disabled {
   text-align: center;
 }
 
+.weekday.holiday {
+  color: var(--red);
+}
+
+.weekday.saturday {
+  color: var(--blue);
+}
+
 .day {
   min-height: 128px;
   padding: 8px;
@@ -449,7 +496,7 @@ button:disabled {
 }
 
 .day.today {
-  background: var(--accent-soft);
+  background: #fff;
 }
 
 .day.selected {
@@ -458,16 +505,49 @@ button:disabled {
 }
 
 .day.checked-in {
-  background: #eefaf6;
+  background: #fff;
 }
 
 .day-number {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   font-size: 13px;
   font-weight: 800;
+}
+
+.date-number {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--text);
+  line-height: 1;
+}
+
+.date-number.holiday {
+  color: var(--red);
+}
+
+.date-number.saturday {
+  color: var(--blue);
+}
+
+.date-number.today-marker {
+  background: var(--text);
+  color: #fff;
+}
+
+.date-number.today-marker.holiday {
+  background: var(--red);
+  color: #fff;
+}
+
+.date-number.today-marker.saturday {
+  background: var(--blue);
+  color: #fff;
 }
 
 .count-pill {
@@ -530,6 +610,48 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.attendance-sticker {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.16);
+}
+
+.attendance-bubble {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
+  margin-top: 5px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #111827;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.18);
+}
+
+.attendance-bubble::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 14px;
+  width: 10px;
+  height: 10px;
+  background: #111827;
+  transform: rotate(45deg);
+}
+
 .details-list {
   display: grid;
   gap: 8px;
@@ -579,6 +701,13 @@ button:disabled {
   border-bottom: 1px solid var(--line);
 }
 
+.checkin-hero-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .checkin-hero h2 {
   margin: 0;
   font-size: 23px;
@@ -589,6 +718,33 @@ button:disabled {
   margin: 8px 0 0;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.hero-account {
+  display: grid;
+  gap: 3px;
+  min-width: 86px;
+  max-width: 42%;
+  padding-top: 2px;
+  text-align: right;
+}
+
+.hero-account strong,
+.hero-account span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-account strong {
+  font-size: 14px;
+}
+
+.hero-account span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .checkin-form {
@@ -846,8 +1002,6 @@ button:disabled {
 }
 
 .calendar-page .day.today {
-  outline: 2px solid #22252d;
-  outline-offset: -2px;
   background: #fff;
 }
 
@@ -856,8 +1010,19 @@ button:disabled {
 }
 
 .calendar-page .day-number {
-  justify-content: center;
+  justify-content: flex-start;
   font-size: 17px;
+}
+
+.calendar-page .date-number {
+  min-width: 28px;
+  height: 28px;
+}
+
+.calendar-page .record-list {
+  align-items: start;
+  min-height: 48px;
+  margin-top: 14px;
 }
 
 .calendar-page .own-checkin {

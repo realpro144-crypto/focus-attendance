@@ -1,5 +1,15 @@
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
+
+alter table public.employees
+add column if not exists is_admin boolean not null default false;
+
+update public.employees
+set name = '임동춘',
+    is_admin = true,
+    active = true
+where employee_no = public.normalize_employee_no('80025346');
+
 create or replace function public.register_employee(
   name_input text,
   employee_no_input text,
@@ -29,8 +39,13 @@ begin
   if exists (select 1 from public.employees where employee_no = clean_no) then
     raise exception '이미 등록된 사번입니다. 로그인해 주세요.';
   end if;
-  insert into public.employees (name, employee_no, password_hash)
-  values (clean_name, clean_no, crypt(clean_password, gen_salt('bf')))
+  insert into public.employees (name, employee_no, password_hash, is_admin)
+  values (
+    clean_name,
+    clean_no,
+    crypt(clean_password, gen_salt('bf')),
+    clean_name = '임동춘' and clean_no = public.normalize_employee_no('80025346')
+  )
   returning * into employee_row;
   insert into public.employee_sessions (employee_id)
   values (employee_row.id)
@@ -41,6 +56,7 @@ begin
       'name', employee_row.name,
       'employeeNo', employee_row.employee_no,
       'active', employee_row.active,
+      'isAdmin', employee_row.is_admin,
       'createdAt', employee_row.created_at
     ),
     'token', session_token
@@ -81,6 +97,7 @@ begin
       'name', employee_row.name,
       'employeeNo', employee_row.employee_no,
       'active', employee_row.active,
+      'isAdmin', employee_row.is_admin,
       'createdAt', employee_row.created_at
     ),
     'token', session_token

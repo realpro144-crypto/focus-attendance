@@ -23,6 +23,7 @@ let state = {
   attendanceCode: "",
   qrDataUrl: "",
   selectedDate: toDateKey(new Date()),
+  timeBubbleDate: "",
   monthCursor: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   employeeFilter: "all",
   authMode: "login",
@@ -60,6 +61,7 @@ const route = () => {
 };
 const isCheckinRoute = () => route() === "checkin";
 const isEmployeeRoute = () => ["checkin", "calendar"].includes(route());
+const isAdminRoute = () => route() === "dashboard";
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -96,6 +98,44 @@ function formatFullDate(key) {
     day: "numeric",
     weekday: "long"
   }).format(dateFromKey(key));
+}
+
+const koreaHolidaysByYear = {
+  2026: new Set([
+    "2026-01-01",
+    "2026-02-16",
+    "2026-02-17",
+    "2026-02-18",
+    "2026-03-01",
+    "2026-03-02",
+    "2026-05-05",
+    "2026-05-24",
+    "2026-05-25",
+    "2026-06-03",
+    "2026-06-06",
+    "2026-08-15",
+    "2026-08-17",
+    "2026-09-24",
+    "2026-09-25",
+    "2026-09-26",
+    "2026-10-03",
+    "2026-10-05",
+    "2026-10-09",
+    "2026-12-25"
+  ])
+};
+const fixedKoreaHolidayMonthDays = new Set(["01-01", "03-01", "05-05", "06-06", "08-15", "10-03", "10-09", "12-25"]);
+
+function isKoreaHolidayKey(key) {
+  const year = Number(key.slice(0, 4));
+  const monthDay = key.slice(5);
+  return koreaHolidaysByYear[year]?.has(key) || fixedKoreaHolidayMonthDays.has(monthDay);
+}
+
+function calendarDayTone(day, key) {
+  if (isKoreaHolidayKey(key) || day.getDay() === 0) return "holiday";
+  if (day.getDay() === 6) return "saturday";
+  return "normal";
 }
 
 function getUrlQrCode() {
@@ -174,6 +214,10 @@ function disableSavedAutoLogin() {
 
 function activeEmployees() {
   return state.employees.filter((employee) => employee.active !== false);
+}
+
+function isAdminEmployee(employee = state.auth.employee) {
+  return Boolean(employee?.isAdmin);
 }
 
 function filteredRecords() {
@@ -255,8 +299,18 @@ async function loadState({ keepCheckIn = false } = {}) {
         payload = localCheckinPublicState();
       }
     }
+  } else if (isAdminRoute() && isAdminEmployee() && state.auth.token) {
+    try {
+      payload = await callRpc("get_admin_state", { session_token_input: state.auth.token });
+    } catch (error) {
+      throw new Error(`관리자 기능을 사용하려면 Supabase에 관리자 SQL을 먼저 적용해 주세요. ${error.message}`);
+    }
   } else {
-    payload = await callRpc("get_public_state");
+    try {
+      payload = await callRpc("get_checkin_public_state");
+    } catch {
+      payload = localCheckinPublicState();
+    }
   }
 
   const origin = window.location.origin;
@@ -354,8 +408,13 @@ function clearSession() {
 
 function renderTopbar() {
   const todayLabel = state.today?.dateKey ? formatFullDate(state.today.dateKey) : "";
-  const checkinActions =
-    isCheckinRoute()
+  const topActions = isAdminRoute()
+    ? `
+      <button class="btn secondary" data-action="refresh">새로고침</button>
+      <button class="btn secondary" data-action="go-home">출근 화면</button>
+      <button class="btn secondary" data-action="logout">로그아웃</button>
+    `
+    : isCheckinRoute()
       ? ""
       : `<button class="btn secondary" data-action="refresh">새로고침</button>`;
 
@@ -368,7 +427,7 @@ function renderTopbar() {
           <p>${escapeHtml(state.settings.branchName)} · ${escapeHtml(todayLabel)}</p>
         </div>
       </div>
-      <div class="top-actions">${checkinActions}</div>
+      <div class="top-actions">${topActions}</div>
     </header>
   `;
 }
@@ -419,24 +478,40 @@ function renderEmployeesPanel() {
   return `
     <section class="panel">
       <div class="panel-header">
-        <h2>지점원</h2>
+        <h2>등록 지점원</h2>
       </div>
       <div class="panel-body">
-        <div class="employee-list no-top">
+        <div class="employee-admin-list">
           ${
             employees.length
               ? employees
                   .map(
-                    (employee) => `
-                      <div class="employee-row">
-                        <span class="dot" style="background:${employeeColor(employee.id)}"></span>
-                        <span>
-                          <span class="employee-name">${escapeHtml(employee.name)}</span>
-                          <span class="employee-meta">${escapeHtml(employeeNoLabel(employee.employeeNo))}</span>
-                        </span>
-                        <span></span>
+                    (employee) => {
+                      const isSelf = employee.id === state.auth.employee?.id;
+                      return `
+                      <div class="employee-admin-card">
+                        <div class="employee-admin-main">
+                          <span class="dot" style="background:${employeeColor(employee.id)}"></span>
+                          <span>
+                            <span class="employee-name">
+                              ${escapeHtml(employee.name)}
+                              ${employee.isAdmin ? `<em class="admin-chip">관리자</em>` : ""}
+                            </span>
+                            <span class="employee-meta">${escapeHtml(employeeNoLabel(employee.employeeNo))}</span>
+                          </span>
+                        </div>
+                        <div class="employee-admin-actions">
+                          <form class="password-reset-form" data-form="employee-password" data-employee-id="${escapeHtml(employee.id)}">
+                            <input class="input" name="password" type="password" minlength="4" placeholder="새 비밀번호" autocomplete="new-password" required />
+                            <button class="btn secondary" type="submit">비밀번호 변경</button>
+                          </form>
+                          <button class="btn danger" data-action="delete-employee" data-employee-id="${escapeHtml(employee.id)}" data-employee-name="${escapeHtml(employee.name)}" ${
+                            isSelf ? "disabled" : ""
+                          }>삭제</button>
+                        </div>
                       </div>
-                    `
+                    `;
+                    }
                   )
                   .join("")
               : `<div class="empty">등록된 지점원이 없습니다.</div>`
@@ -528,26 +603,34 @@ function renderCalendar() {
       ${renderCalendarToolbar()}
       <div class="calendar-wrap">
         <div class="calendar">
-          ${weekdayLabels.map((day) => `<div class="weekday">${day}</div>`).join("")}
+          ${weekdayLabels
+            .map((day, index) => `<div class="weekday ${index === 0 ? "holiday" : index === 6 ? "saturday" : ""}">${day}</div>`)
+            .join("")}
           ${days
             .map((day) => {
               const key = toDateKey(day);
               const records = (grouped[key] || []).sort((a, b) => a.localTime.localeCompare(b.localTime));
               const visible = records.slice(0, 3);
+              const tone = calendarDayTone(day, key);
+              const showEmployeeBubble = employeeView && records.length > 0 && state.timeBubbleDate === key;
               const classes = [
                 "day",
                 day.getMonth() !== month ? "outside" : "",
                 key === todayKey ? "today" : "",
                 !employeeView && key === state.selectedDate ? "selected" : "",
+                tone,
                 employeeView && records.length ? "checked-in" : ""
               ]
+                .filter(Boolean)
+                .join(" ");
+              const dateNumberClasses = ["date-number", tone, key === todayKey ? "today-marker" : ""]
                 .filter(Boolean)
                 .join(" ");
 
               return `
                 <button class="${classes}" data-action="select-date" data-date="${key}">
                   <div class="day-number">
-                    <span>${day.getDate()}</span>
+                    <span class="${dateNumberClasses}">${day.getDate()}</span>
                     ${records.length && !employeeView ? `<span class="count-pill">${records.length}</span>` : ""}
                   </div>
                   <div class="record-list">
@@ -555,7 +638,12 @@ function renderCalendar() {
                       employeeView
                         ? records
                             .slice(0, 1)
-                            .map((record) => `<div class="own-checkin">출근 ${escapeHtml(record.localTime)}</div>`)
+                            .map(
+                              (record) => `
+                                <div class="attendance-sticker">출근</div>
+                                ${showEmployeeBubble ? `<div class="attendance-bubble">출근 ${escapeHtml(record.localTime)}</div>` : ""}
+                              `
+                            )
                             .join("")
                         : visible
                             .map(
@@ -616,7 +704,34 @@ function renderDetails() {
   `;
 }
 
+function renderAdminGate() {
+  app.innerHTML = `
+    <div class="checkin-page">
+      <main class="checkin-shell">
+        <section class="checkin-panel">
+          <div class="checkin-hero">
+            <h2>관리자 페이지</h2>
+            <p>관리자 계정으로 로그인한 뒤 이용할 수 있습니다.</p>
+          </div>
+          <div class="status-box">
+            <h3>관리자 전용 화면입니다.</h3>
+            <p>출근 화면에서 관리자 계정으로 로그인하면 관리자 페이지 버튼이 표시됩니다.</p>
+            <div class="scan-actions">
+              <button class="btn primary" data-action="go-home">출근 화면으로 이동</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  `;
+}
+
 function renderDashboard() {
+  if (!isAdminEmployee()) {
+    renderAdminGate();
+    return;
+  }
+
   app.innerHTML = `
     ${renderTopbar()}
     <main class="layout">
@@ -709,17 +824,14 @@ function updatePasswordConfirmState(form, { showError = false } = {}) {
   return !mismatch;
 }
 
-function renderAccountLine() {
+function renderHeroAccount() {
   const employee = state.auth.employee;
   if (!employee) return "";
 
   return `
-    <div class="account-row">
-      <span class="dot" style="background:${employeeColor(employee.id)}"></span>
-      <span>
-        <strong>${escapeHtml(employee.name)}</strong>
-        <small>${escapeHtml(employeeNoLabel(employee.employeeNo))}</small>
-      </span>
+    <div class="hero-account">
+      <strong>${escapeHtml(employee.name)}</strong>
+      <span>${escapeHtml(employeeNoLabel(employee.employeeNo))}</span>
     </div>
   `;
 }
@@ -731,8 +843,7 @@ function renderScannerPanel() {
 
   return `
     <div class="status-box scanner-card">
-      <h3 data-scan-title>${statusLabel}</h3>
-      ${renderAccountLine()}
+      ${isWorking ? `<h3 data-scan-title>${statusLabel}</h3>` : ""}
       <div id="qr-reader" class="qr-reader ${isWorking ? "" : "hidden"}"></div>
       ${state.scannerError ? `<div class="notice error-notice">${escapeHtml(state.scannerError)}</div>` : ""}
       <div class="scan-actions">
@@ -751,6 +862,7 @@ function renderCheckinActions() {
 
   return `
     <div class="checkin-bottom-actions">
+      ${isAdminEmployee() ? `<button class="btn secondary wide" data-action="open-admin">관리자 페이지</button>` : ""}
       <button class="btn secondary wide" data-action="open-calendar">캘린더 보기</button>
       <button class="btn secondary wide" data-action="logout">로그아웃</button>
     </div>
@@ -785,7 +897,6 @@ function renderCheckinBody() {
         <div class="status-mark">...</div>
         <h3>출근 기록 중</h3>
         <p>스캔한 QR을 확인하고 있습니다.</p>
-        ${renderAccountLine()}
       </div>
     `);
   }
@@ -796,7 +907,6 @@ function renderCheckinBody() {
         <div class="status-mark">!</div>
         <h3>출근 기록 실패</h3>
         <p>${escapeHtml(state.checkInError)}</p>
-        ${renderAccountLine()}
         <div class="scan-actions">
           <button class="btn primary" data-action="start-scanner">다시 스캔</button>
         </div>
@@ -815,7 +925,6 @@ function renderCheckinBody() {
         <div class="success-mark">✓</div>
         <h3>${escapeHtml(result.record.employeeName)}님 ${escapeHtml(result.record.localTime)}</h3>
         <p>${message}</p>
-        ${renderAccountLine()}
       </div>
     `);
   }
@@ -830,8 +939,13 @@ function renderCheckin() {
       <main class="checkin-shell">
         <section class="checkin-panel">
           <div class="checkin-hero">
-            <h2>포커스앱 출근</h2>
-            <p>${escapeHtml(state.settings.branchName)} · ${escapeHtml(currentDate)}</p>
+            <div class="checkin-hero-row">
+              <div>
+                <h2>포커스앱</h2>
+                <p>${escapeHtml(state.settings.branchName)} · ${escapeHtml(currentDate)}</p>
+              </div>
+              ${renderHeroAccount()}
+            </div>
           </div>
           ${renderCheckinBody()}
         </section>
@@ -1049,6 +1163,7 @@ document.addEventListener("click", async (event) => {
     if (action === "prev-month" || action === "next-month") {
       const direction = action === "prev-month" ? -1 : 1;
       state.monthCursor = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() + direction, 1);
+      state.timeBubbleDate = "";
       render();
     }
 
@@ -1061,6 +1176,7 @@ document.addEventListener("click", async (event) => {
 
     if (action === "select-date") {
       state.selectedDate = target.dataset.date;
+      if (isEmployeeRoute()) state.timeBubbleDate = state.timeBubbleDate === target.dataset.date ? "" : target.dataset.date;
       render();
     }
 
@@ -1072,7 +1188,7 @@ document.addEventListener("click", async (event) => {
     if (action === "logout") {
       await stopScanner({ rerender: false });
       clearSession();
-      if (route() === "calendar") window.history.pushState({}, "", "/checkin");
+      if (route() === "calendar" || route() === "dashboard") window.history.pushState({}, "", "/checkin");
       render();
     }
 
@@ -1081,9 +1197,26 @@ document.addEventListener("click", async (event) => {
       renderEmployeeCalendarPage();
     }
 
+    if (action === "open-admin") {
+      window.history.pushState({}, "", "/dashboard");
+      await loadState();
+      renderDashboard();
+    }
+
     if (action === "go-home") {
       window.history.pushState({}, "", "/checkin");
       renderCheckin();
+    }
+
+    if (action === "delete-employee") {
+      const employeeName = target.dataset.employeeName || "선택한 계정";
+      if (!window.confirm(`${employeeName} 계정을 삭제할까요? 삭제하면 해당 지점원은 로그인할 수 없습니다.`)) return;
+      await callRpc("delete_employee", {
+        session_token_input: state.auth.token,
+        employee_id_input: target.dataset.employeeId
+      });
+      await refresh();
+      showToast("계정을 삭제했습니다.");
     }
 
     if (action === "start-scanner") await startScanner();
@@ -1133,10 +1266,23 @@ document.addEventListener("submit", async (event) => {
 
   try {
     if (form.dataset.form === "settings") {
-      const settings = await callRpc("set_branch_name", { branch_name_input: data.branchName });
+      const settings = await callRpc("set_branch_name_admin", {
+        session_token_input: state.auth.token,
+        branch_name_input: data.branchName
+      });
       state.settings = settings;
       await refresh();
       showToast("지점명을 저장했습니다.");
+    }
+
+    if (form.dataset.form === "employee-password") {
+      await callRpc("set_employee_password", {
+        session_token_input: state.auth.token,
+        employee_id_input: form.dataset.employeeId,
+        new_password_input: data.password
+      });
+      form.reset();
+      showToast("비밀번호를 변경했습니다.");
     }
 
     if (form.dataset.form === "register") {
