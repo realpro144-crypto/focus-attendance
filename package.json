@@ -4,10 +4,14 @@
   "private": true,
   "description": "Branch QR attendance calendar app",
   "scripts": {
-    "start": "vite preview",
-    "dev": "vite",
+    "start": "vite preview --host 127.0.0.1",
+    "dev": "vite --host 127.0.0.1",
+    "dev:lan": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview --host 127.0.0.1",
+    "preview:lan": "vite preview --host 0.0.0.0",
+    "check": "npm run doctor && npm run build",
+    "doctor": "node scripts/doctor.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.0",
