@@ -1,0 +1,24 @@
+{
+  "name": "branch-qr-attendance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Branch QR attendance calendar app",
+  "scripts": {
+    "start": "vite preview",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.0",
+    "@vitejs/plugin-react": "^6.0.2",
+    "html5-qrcode": "^2.3.8",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "vite": "^8.0.16"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
