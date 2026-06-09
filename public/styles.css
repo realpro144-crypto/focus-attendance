@@ -677,55 +677,152 @@ button:disabled {
 
 .checkin-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f6f7f9 0%, #eef7f6 100%);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(118, 198, 214, 0.28), transparent 34%),
+    radial-gradient(circle at 18% 92%, rgba(30, 160, 142, 0.2), transparent 32%),
+    linear-gradient(152deg, #061f2b 0%, #062f38 45%, #023a3b 100%);
+}
+
+.checkin-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 0 55%, rgba(255, 255, 255, 0.06) 55% 56%, transparent 56%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 24px);
+  clip-path: polygon(64% 11%, 96% 0, 100% 100%, 52% 100%);
+  opacity: 0.5;
 }
 
 .checkin-shell {
+  position: relative;
+  z-index: 1;
   display: grid;
-  width: min(760px, 100%);
+  width: min(430px, 100%);
+  min-height: 100vh;
   margin: 0 auto;
-  padding: 12px 14px 24px;
+  padding: 34px 18px 28px;
   place-items: start center;
 }
 
 .checkin-panel {
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: var(--shadow);
 }
 
 .checkin-hero {
-  padding: 24px 22px 16px;
-  border-bottom: 1px solid var(--line);
+  position: relative;
+  min-height: 286px;
+  padding: 8px 4px 26px;
+  color: #fff;
 }
 
-.checkin-hero-row {
+.portal-skyline {
+  position: absolute;
+  right: -18px;
+  top: 38px;
+  width: 168px;
+  height: 226px;
+  border: 1px solid rgba(158, 220, 226, 0.14);
+  background:
+    linear-gradient(118deg, rgba(255, 255, 255, 0.1), transparent 32%),
+    repeating-linear-gradient(90deg, rgba(182, 236, 239, 0.2) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(0deg, rgba(182, 236, 239, 0.18) 0 1px, transparent 1px 16px),
+    linear-gradient(150deg, rgba(16, 73, 88, 0.64), rgba(5, 28, 42, 0.3));
+  clip-path: polygon(36% 0, 100% 18%, 100% 100%, 0 100%, 0 30%);
+  opacity: 0.58;
+}
+
+.focus-brand {
+  position: relative;
+  z-index: 1;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 16px;
+  margin-top: 2px;
+}
+
+.focus-mark {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border-radius: 10px 18px 10px 18px;
+  background: linear-gradient(145deg, #59f4db 0%, #17b9aa 50%, #0b7d84 100%);
+  color: #08323a;
+  font-size: 35px;
+  font-weight: 950;
+  line-height: 1;
+  transform: skewY(-8deg);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.26);
+}
+
+.focus-logo-text {
+  display: grid;
+  gap: 5px;
+}
+
+.focus-logo-text strong {
+  color: #f8fbff;
+  font-size: 36px;
+  line-height: 0.95;
+  letter-spacing: 0;
+  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.focus-logo-text span {
+  color: #44ead7;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 
 .checkin-hero h2 {
-  margin: 0;
-  font-size: 23px;
-  line-height: 1.25;
+  position: relative;
+  z-index: 1;
+  max-width: 310px;
+  margin: 8px 0 0;
+  color: #fff;
+  font-size: 34px;
+  line-height: 1.18;
 }
 
-.checkin-hero p {
-  margin: 8px 0 0;
-  color: var(--muted);
+.checkin-hero .hero-greeting {
+  position: relative;
+  z-index: 1;
+  margin: 58px 0 0;
+  color: #48ead8;
+  font-size: 27px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.checkin-hero .hero-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 300px;
+  margin: 18px 0 0;
+  color: rgba(238, 250, 252, 0.78);
+  font-size: 17px;
   line-height: 1.5;
 }
 
 .hero-account {
+  position: absolute;
+  right: 4px;
+  bottom: 22px;
+  z-index: 2;
   display: grid;
   gap: 3px;
   min-width: 86px;
   max-width: 42%;
-  padding-top: 2px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(3, 29, 43, 0.42);
+  backdrop-filter: blur(8px);
   text-align: right;
 }
 
@@ -742,64 +839,242 @@ button:disabled {
 }
 
 .hero-account span {
-  color: var(--muted);
+  color: rgba(238, 250, 252, 0.68);
   font-size: 12px;
   font-weight: 800;
 }
 
 .checkin-form {
   display: grid;
-  gap: 14px;
-  padding: 20px 22px 22px;
+  gap: 28px;
+  padding: 22px 22px 26px;
+  border: 1px solid rgba(230, 236, 244, 0.92);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 26px 62px rgba(4, 20, 34, 0.34);
 }
 
 .auth-form {
   display: grid;
-  gap: 14px;
+  gap: 22px;
 }
 
 .auth-options {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .check-option {
   display: flex;
   align-items: center;
   gap: 9px;
-  color: var(--text);
+  color: #425169;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .check-option input {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   accent-color: var(--accent);
 }
 
 .segmented {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #f4f6f8;
+  gap: 8px;
+  padding: 6px;
+  border: 0;
+  border-radius: 14px;
+  background: #f2f4f8;
 }
 
 .segmented button {
-  min-height: 36px;
-  border-radius: 6px;
+  display: inline-flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 12px;
   background: transparent;
-  color: var(--muted);
-  font-weight: 800;
+  color: #27364b;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .segmented button.active {
   background: #fff;
-  color: var(--text);
-  box-shadow: 0 1px 4px rgba(23, 32, 51, 0.1);
+  color: #081f2c;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+}
+
+.segmented button.active::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  width: 72px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #006b66, #25c7b4);
+}
+
+.segmented button {
+  position: relative;
+}
+
+.tab-icon,
+.input-icon {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.tab-icon-user,
+.icon-id,
+.icon-user {
+  width: 22px;
+  height: 22px;
+}
+
+.tab-icon-user::before,
+.icon-id::before,
+.icon-user::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.tab-icon-user::after,
+.icon-id::after,
+.icon-user::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  bottom: 2px;
+  width: 16px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-top-width: 5px;
+  border-radius: 10px 10px 4px 4px;
+}
+
+.tab-icon-team {
+  width: 26px;
+  height: 22px;
+}
+
+.tab-icon-team::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 12px 0 0 currentColor;
+}
+
+.tab-icon-team::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  bottom: 3px;
+  width: 12px;
+  height: 8px;
+  border-radius: 9px 9px 4px 4px;
+  background: currentColor;
+  box-shadow: 12px 0 0 currentColor;
+}
+
+.auth-input-wrap {
+  position: relative;
+  display: block;
+}
+
+.auth-input-wrap .input {
+  min-height: 58px;
+  border-color: #cad3df;
+  border-radius: 12px;
+  padding-left: 52px;
+  color: #172033;
+  font-size: 16px;
+}
+
+.auth-input-wrap .input::placeholder {
+  color: #8a94a6;
+}
+
+.auth-input-wrap .input:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+}
+
+.input-icon {
+  position: absolute;
+  left: 17px;
+  top: 50%;
+  z-index: 1;
+  color: #0f766e;
+  transform: translateY(-50%);
+}
+
+.icon-lock {
+  width: 22px;
+  height: 24px;
+}
+
+.icon-lock::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  border: 3px solid currentColor;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+
+.icon-lock::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  bottom: 1px;
+  width: 18px;
+  height: 15px;
+  border: 3px solid currentColor;
+  border-radius: 5px;
+}
+
+.checkin-form .field {
+  gap: 10px;
+}
+
+.checkin-form .field > span:first-child {
+  color: #3b465a;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.checkin-form .btn.primary {
+  min-height: 62px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #006366 0%, #008574 55%, #00635f 100%);
+  box-shadow: 0 14px 28px rgba(0, 117, 102, 0.28);
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.checkin-form .btn.primary:hover {
+  background: linear-gradient(135deg, #005458 0%, #007465 55%, #005753 100%);
 }
 
 .success-box {
@@ -1193,5 +1468,60 @@ button:disabled {
   .icon-btn {
     width: 38px;
     height: 38px;
+  }
+}
+
+@media (max-width: 430px) {
+  .checkin-shell {
+    padding: 30px 14px 24px;
+  }
+
+  .checkin-hero {
+    min-height: 278px;
+  }
+
+  .focus-brand {
+    gap: 13px;
+  }
+
+  .focus-mark {
+    width: 52px;
+    height: 52px;
+    font-size: 31px;
+  }
+
+  .focus-logo-text strong {
+    font-size: 32px;
+  }
+
+  .focus-logo-text span {
+    font-size: 13px;
+  }
+
+  .checkin-hero .hero-greeting {
+    margin-top: 52px;
+    font-size: 25px;
+  }
+
+  .checkin-hero h2 {
+    font-size: 31px;
+  }
+
+  .checkin-form {
+    padding: 20px 18px 24px;
+  }
+
+  .segmented button {
+    min-height: 56px;
+    gap: 8px;
+    font-size: 15px;
+  }
+
+  .auth-options {
+    gap: 10px;
+  }
+
+  .check-option {
+    font-size: 13px;
   }
 }

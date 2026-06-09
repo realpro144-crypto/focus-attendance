@@ -755,8 +755,14 @@ function renderAuthPanel() {
   return `
     <div class="checkin-form">
       <div class="segmented" role="tablist" aria-label="로그인 방식">
-        <button class="${!isRegister ? "active" : ""}" data-action="auth-mode" data-mode="login" type="button">로그인</button>
-        <button class="${isRegister ? "active" : ""}" data-action="auth-mode" data-mode="register" type="button">지점원 등록</button>
+        <button class="${!isRegister ? "active" : ""}" data-action="auth-mode" data-mode="login" type="button">
+          <span class="tab-icon tab-icon-user" aria-hidden="true"></span>
+          <span>로그인</span>
+        </button>
+        <button class="${isRegister ? "active" : ""}" data-action="auth-mode" data-mode="register" type="button">
+          <span class="tab-icon tab-icon-team" aria-hidden="true"></span>
+          <span>지점원 등록</span>
+        </button>
       </div>
       <form class="auth-form" data-form="${isRegister ? "register" : "login"}">
         ${
@@ -764,29 +770,41 @@ function renderAuthPanel() {
             ? `
               <label class="field">
                 <span>이름</span>
-                <input class="input" name="name" autocomplete="name" required />
+                <span class="auth-input-wrap">
+                  <span class="input-icon icon-user" aria-hidden="true"></span>
+                  <input class="input" name="name" autocomplete="name" placeholder="이름을 입력하세요" required />
+                </span>
               </label>
             `
             : ""
         }
         <label class="field">
           <span>사번</span>
-          <input class="input" name="employeeNo" autocomplete="username" inputmode="text" value="${
-            !isRegister ? escapeHtml(saved.employeeNo) : ""
-          }" required />
+          <span class="auth-input-wrap">
+            <span class="input-icon icon-id" aria-hidden="true"></span>
+            <input class="input" name="employeeNo" autocomplete="username" inputmode="text" placeholder="사번을 입력하세요" value="${
+              !isRegister ? escapeHtml(saved.employeeNo) : ""
+            }" required />
+          </span>
         </label>
         <label class="field">
           <span>비밀번호</span>
-          <input class="input" name="password" type="password" autocomplete="${isRegister ? "new-password" : "current-password"}" value="${
-            !isRegister ? escapeHtml(saved.password) : ""
-          }" required />
+          <span class="auth-input-wrap">
+            <span class="input-icon icon-lock" aria-hidden="true"></span>
+            <input class="input" name="password" type="password" autocomplete="${isRegister ? "new-password" : "current-password"}" placeholder="비밀번호를 입력하세요" value="${
+              !isRegister ? escapeHtml(saved.password) : ""
+            }" required />
+          </span>
         </label>
         ${
           isRegister
             ? `
               <label class="field">
                 <span>비밀번호 확인</span>
-                <input class="input" name="passwordConfirm" type="password" autocomplete="new-password" data-password-confirm aria-describedby="password-confirm-error" required />
+                <span class="auth-input-wrap">
+                  <span class="input-icon icon-lock" aria-hidden="true"></span>
+                  <input class="input" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="비밀번호를 다시 입력하세요" data-password-confirm aria-describedby="password-confirm-error" required />
+                </span>
                 <small id="password-confirm-error" class="field-error hidden" data-password-error>비밀번호가 일치하지 않습니다.</small>
               </label>
             `
@@ -933,19 +951,23 @@ function renderCheckinBody() {
 }
 
 function renderCheckin() {
-  const currentDate = state.today?.dateKey ? formatFullDate(state.today.dateKey) : "";
   app.innerHTML = `
     <div class="checkin-page">
       <main class="checkin-shell">
         <section class="checkin-panel">
           <div class="checkin-hero">
-            <div class="checkin-hero-row">
-              <div>
-                <h2>포커스앱</h2>
-                <p>${escapeHtml(state.settings.branchName)} · ${escapeHtml(currentDate)}</p>
+            <div class="portal-skyline" aria-hidden="true"></div>
+            <div class="focus-brand">
+              <div class="focus-mark" aria-hidden="true">F</div>
+              <div class="focus-logo-text">
+                <strong>FOCUS</strong>
+                <span>BRANCH PORTAL</span>
               </div>
-              ${renderHeroAccount()}
             </div>
+            <p class="hero-greeting">안녕하세요!</p>
+            <h2>FOCUS 지점 업무 포털</h2>
+            <p class="hero-copy">지점의 모든 업무를 한 곳에서 편리하게</p>
+            ${renderHeroAccount()}
           </div>
           ${renderCheckinBody()}
         </section>
