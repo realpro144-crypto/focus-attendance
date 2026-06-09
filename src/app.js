@@ -958,9 +958,19 @@ function renderCheckin() {
           <div class="checkin-hero">
             <div class="portal-skyline" aria-hidden="true"></div>
             <div class="focus-brand">
-              <div class="focus-mark" aria-hidden="true">F</div>
+              <div class="focus-mark" aria-hidden="true">
+                <span class="focus-mark-piece mark-stem"></span>
+                <span class="focus-mark-piece mark-top"></span>
+                <span class="focus-mark-piece mark-mid"></span>
+              </div>
               <div class="focus-logo-text">
-                <strong>FOCUS</strong>
+                <strong class="focus-word" aria-label="FOCUS">
+                  <span>F</span>
+                  <span>O</span>
+                  <span>C</span>
+                  <span>U</span>
+                  <span>S</span>
+                </strong>
                 <span>BRANCH PORTAL</span>
               </div>
             </div>

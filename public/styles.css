@@ -676,12 +676,21 @@ button:disabled {
 }
 
 .checkin-page {
-  min-height: 100vh;
-  overflow: hidden;
+  height: 100vh;
+  height: 100svh;
+  min-height: 620px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
   background:
-    radial-gradient(circle at 88% 8%, rgba(118, 198, 214, 0.28), transparent 34%),
-    radial-gradient(circle at 18% 92%, rgba(30, 160, 142, 0.2), transparent 32%),
-    linear-gradient(152deg, #061f2b 0%, #062f38 45%, #023a3b 100%);
+    radial-gradient(circle at 84% 5%, rgba(126, 202, 222, 0.34), transparent 30%),
+    radial-gradient(circle at 15% 86%, rgba(11, 144, 129, 0.28), transparent 36%),
+    linear-gradient(152deg, #041927 0%, #07303a 47%, #003b3b 100%);
+}
+
+.checkin-page::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .checkin-page::before {
@@ -690,11 +699,9 @@ button:disabled {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(115deg, transparent 0 55%, rgba(255, 255, 255, 0.06) 55% 56%, transparent 56%),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 28px),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 24px);
-  clip-path: polygon(64% 11%, 96% 0, 100% 100%, 52% 100%);
-  opacity: 0.5;
+    radial-gradient(circle at 52% 22%, rgba(255, 255, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(3, 13, 25, 0.02) 0%, rgba(0, 20, 30, 0.18) 100%);
+  opacity: 1;
 }
 
 .checkin-shell {
@@ -702,37 +709,67 @@ button:disabled {
   z-index: 1;
   display: grid;
   width: min(430px, 100%);
-  min-height: 100vh;
+  min-height: 100%;
   margin: 0 auto;
-  padding: 34px 18px 28px;
+  padding: 22px 18px 16px;
   place-items: start center;
 }
 
 .checkin-panel {
+  isolation: isolate;
   width: 100%;
 }
 
 .checkin-hero {
   position: relative;
-  min-height: 286px;
-  padding: 8px 4px 26px;
+  min-height: 238px;
+  padding: 4px 4px 14px;
   color: #fff;
 }
 
 .portal-skyline {
   position: absolute;
-  right: -18px;
-  top: 38px;
-  width: 168px;
-  height: 226px;
-  border: 1px solid rgba(158, 220, 226, 0.14);
-  background:
-    linear-gradient(118deg, rgba(255, 255, 255, 0.1), transparent 32%),
-    repeating-linear-gradient(90deg, rgba(182, 236, 239, 0.2) 0 1px, transparent 1px 18px),
-    repeating-linear-gradient(0deg, rgba(182, 236, 239, 0.18) 0 1px, transparent 1px 16px),
-    linear-gradient(150deg, rgba(16, 73, 88, 0.64), rgba(5, 28, 42, 0.3));
-  clip-path: polygon(36% 0, 100% 18%, 100% 100%, 0 100%, 0 30%);
+  right: -30px;
+  top: 28px;
+  z-index: 0;
+  width: 214px;
+  height: 252px;
   opacity: 0.58;
+  filter: drop-shadow(-18px 18px 26px rgba(0, 0, 0, 0.28));
+}
+
+.portal-skyline::before,
+.portal-skyline::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  border: 1px solid rgba(164, 223, 232, 0.14);
+}
+
+.portal-skyline::before {
+  right: 42px;
+  width: 142px;
+  height: 238px;
+  background:
+    linear-gradient(124deg, rgba(211, 245, 251, 0.22) 0%, transparent 18%),
+    linear-gradient(160deg, rgba(79, 141, 163, 0.42) 0%, rgba(12, 56, 77, 0.64) 54%, rgba(2, 25, 43, 0.88) 100%),
+    repeating-linear-gradient(90deg, transparent 0 14px, rgba(206, 247, 251, 0.2) 14px 15px),
+    repeating-linear-gradient(0deg, transparent 0 13px, rgba(206, 247, 251, 0.15) 13px 14px);
+  background-blend-mode: screen, normal, screen, screen;
+  clip-path: polygon(45% 0, 100% 17%, 100% 100%, 0 100%, 0 31%);
+}
+
+.portal-skyline::after {
+  right: 8px;
+  width: 76px;
+  height: 206px;
+  background:
+    linear-gradient(105deg, rgba(120, 202, 215, 0.25), transparent 22%),
+    linear-gradient(153deg, rgba(29, 91, 112, 0.58), rgba(3, 31, 51, 0.82)),
+    repeating-linear-gradient(90deg, transparent 0 13px, rgba(191, 237, 244, 0.17) 13px 14px),
+    repeating-linear-gradient(0deg, transparent 0 12px, rgba(191, 237, 244, 0.12) 12px 13px);
+  background-blend-mode: screen, normal, screen, screen;
+  clip-path: polygon(0 9%, 100% 24%, 100% 100%, 0 100%);
 }
 
 .focus-brand {
@@ -740,41 +777,92 @@ button:disabled {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-top: 2px;
+  gap: 15px;
+  margin-top: 0;
 }
 
 .focus-mark {
-  display: grid;
-  width: 58px;
-  height: 58px;
-  place-items: center;
-  border-radius: 10px 18px 10px 18px;
-  background: linear-gradient(145deg, #59f4db 0%, #17b9aa 50%, #0b7d84 100%);
-  color: #08323a;
-  font-size: 35px;
-  font-weight: 950;
-  line-height: 1;
-  transform: skewY(-8deg);
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.26);
+  position: relative;
+  width: 60px;
+  height: 64px;
+  filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.28));
+}
+
+.focus-mark-piece {
+  position: absolute;
+  display: block;
+  transform: skewY(-18deg);
+}
+
+.mark-stem {
+  left: 4px;
+  top: 12px;
+  width: 21px;
+  height: 48px;
+  border-radius: 4px 0 0 5px;
+  background: linear-gradient(180deg, #cafff3 0%, #52efe0 28%, #139a9d 100%);
+  clip-path: polygon(0 15%, 100% 0, 100% 100%, 0 82%);
+}
+
+.mark-top {
+  left: 19px;
+  top: 6px;
+  width: 41px;
+  height: 17px;
+  border-radius: 3px 7px 3px 3px;
+  background: linear-gradient(135deg, #61f5e4 0%, #21cabd 54%, #0a8b92 100%);
+  clip-path: polygon(0 0, 100% 0, 84% 100%, 0 100%);
+}
+
+.mark-mid {
+  left: 17px;
+  top: 31px;
+  width: 34px;
+  height: 15px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, #55ecd8 0%, #12b4a9 65%, #087c83 100%);
+  clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%);
+}
+
+.focus-mark::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 13px;
+  width: 20px;
+  height: 48px;
+  background: linear-gradient(180deg, rgba(0, 72, 86, 0.34), transparent 60%);
+  clip-path: polygon(0 15%, 100% 0, 100% 100%, 0 82%);
+  transform: skewY(-18deg);
+  mix-blend-mode: multiply;
 }
 
 .focus-logo-text {
   display: grid;
-  gap: 5px;
+  gap: 4px;
 }
 
 .focus-logo-text strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   color: #f8fbff;
-  font-size: 36px;
-  line-height: 0.95;
+  font-size: 34px;
+  line-height: 1;
   letter-spacing: 0;
+  font-weight: 650;
   text-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 
-.focus-logo-text span {
+.focus-logo-text strong span {
+  display: inline-block;
+  min-width: 0.66em;
+  text-align: center;
+}
+
+.focus-logo-text > span {
   color: #44ead7;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 900;
   letter-spacing: 0;
 }
@@ -783,19 +871,19 @@ button:disabled {
   position: relative;
   z-index: 1;
   max-width: 310px;
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: #fff;
-  font-size: 34px;
+  font-size: 29px;
   line-height: 1.18;
 }
 
 .checkin-hero .hero-greeting {
   position: relative;
   z-index: 1;
-  margin: 58px 0 0;
+  margin: 38px 0 0;
   color: #48ead8;
-  font-size: 27px;
-  font-weight: 900;
+  font-size: 22px;
+  font-weight: 700;
   line-height: 1.15;
 }
 
@@ -803,9 +891,9 @@ button:disabled {
   position: relative;
   z-index: 1;
   max-width: 300px;
-  margin: 18px 0 0;
+  margin: 12px 0 0;
   color: rgba(238, 250, 252, 0.78);
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.5;
 }
 
@@ -845,18 +933,22 @@ button:disabled {
 }
 
 .checkin-form {
+  position: relative;
+  z-index: 2;
   display: grid;
-  gap: 28px;
-  padding: 22px 22px 26px;
+  gap: 18px;
+  padding: 17px 18px 18px;
   border: 1px solid rgba(230, 236, 244, 0.92);
-  border-radius: 20px;
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 26px 62px rgba(4, 20, 34, 0.34);
+  box-shadow:
+    0 22px 54px rgba(4, 20, 34, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .auth-form {
   display: grid;
-  gap: 22px;
+  gap: 16px;
 }
 
 .auth-options {
@@ -871,33 +963,33 @@ button:disabled {
   align-items: center;
   gap: 9px;
   color: #425169;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
 }
 
 .check-option input {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   accent-color: var(--accent);
 }
 
 .segmented {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 6px;
+  gap: 7px;
+  padding: 5px;
   border: 0;
-  border-radius: 14px;
-  background: #f2f4f8;
+  border-radius: 13px;
+  background: linear-gradient(180deg, #f5f7fb 0%, #eef2f7 100%);
 }
 
 .segmented button {
   display: inline-flex;
-  min-height: 58px;
+  min-height: 48px;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border-radius: 12px;
+  border-radius: 11px;
   background: transparent;
   color: #27364b;
   font-weight: 900;
@@ -913,8 +1005,8 @@ button:disabled {
 .segmented button.active::after {
   content: "";
   position: absolute;
-  bottom: 4px;
-  width: 72px;
+  bottom: 3px;
+  width: 64px;
   height: 3px;
   border-radius: 999px;
   background: linear-gradient(90deg, #006b66, #25c7b4);
@@ -959,10 +1051,10 @@ button:disabled {
   left: 3px;
   bottom: 2px;
   width: 16px;
-  height: 10px;
-  border: 2px solid currentColor;
-  border-top-width: 5px;
+  height: 9px;
+  border: 0;
   border-radius: 10px 10px 4px 4px;
+  background: currentColor;
 }
 
 .tab-icon-team {
@@ -1000,12 +1092,12 @@ button:disabled {
 }
 
 .auth-input-wrap .input {
-  min-height: 58px;
+  min-height: 50px;
   border-color: #cad3df;
-  border-radius: 12px;
-  padding-left: 52px;
+  border-radius: 11px;
+  padding-left: 48px;
   color: #172033;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .auth-input-wrap .input::placeholder {
@@ -1019,7 +1111,7 @@ button:disabled {
 
 .input-icon {
   position: absolute;
-  left: 17px;
+  left: 16px;
   top: 50%;
   z-index: 1;
   color: #0f766e;
@@ -1034,11 +1126,11 @@ button:disabled {
 .icon-lock::before {
   content: "";
   position: absolute;
-  left: 5px;
+  left: 4px;
   top: 0;
-  width: 12px;
-  height: 12px;
-  border: 3px solid currentColor;
+  width: 14px;
+  height: 13px;
+  border: 2.5px solid currentColor;
   border-bottom: 0;
   border-radius: 10px 10px 0 0;
 }
@@ -1050,26 +1142,31 @@ button:disabled {
   bottom: 1px;
   width: 18px;
   height: 15px;
-  border: 3px solid currentColor;
+  border: 2.5px solid currentColor;
   border-radius: 5px;
+  background:
+    radial-gradient(circle at 50% 43%, currentColor 0 2px, transparent 2.5px),
+    linear-gradient(currentColor, currentColor) center 10px / 2px 5px no-repeat;
 }
 
 .checkin-form .field {
-  gap: 10px;
+  gap: 8px;
 }
 
 .checkin-form .field > span:first-child {
   color: #3b465a;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 900;
 }
 
 .checkin-form .btn.primary {
-  min-height: 62px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #006366 0%, #008574 55%, #00635f 100%);
-  box-shadow: 0 14px 28px rgba(0, 117, 102, 0.28);
-  font-size: 18px;
+  min-height: 54px;
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at 52% 10%, rgba(255, 255, 255, 0.16), transparent 26%),
+    linear-gradient(135deg, #005f66 0%, #008574 55%, #00635f 100%);
+  box-shadow: 0 12px 24px rgba(0, 117, 102, 0.28);
+  font-size: 17px;
   font-weight: 950;
 }
 
@@ -1473,48 +1570,47 @@ button:disabled {
 
 @media (max-width: 430px) {
   .checkin-shell {
-    padding: 30px 14px 24px;
+    padding: 20px 14px 14px;
   }
 
   .checkin-hero {
-    min-height: 278px;
+    min-height: 232px;
   }
 
   .focus-brand {
-    gap: 13px;
+    gap: 12px;
   }
 
   .focus-mark {
-    width: 52px;
-    height: 52px;
-    font-size: 31px;
+    width: 54px;
+    height: 58px;
   }
 
   .focus-logo-text strong {
-    font-size: 32px;
-  }
-
-  .focus-logo-text span {
-    font-size: 13px;
-  }
-
-  .checkin-hero .hero-greeting {
-    margin-top: 52px;
-    font-size: 25px;
-  }
-
-  .checkin-hero h2 {
     font-size: 31px;
   }
 
+  .focus-logo-text > span {
+    font-size: 12px;
+  }
+
+  .checkin-hero .hero-greeting {
+    margin-top: 34px;
+    font-size: 22px;
+  }
+
+  .checkin-hero h2 {
+    font-size: 28px;
+  }
+
   .checkin-form {
-    padding: 20px 18px 24px;
+    padding: 16px 16px 17px;
   }
 
   .segmented button {
-    min-height: 56px;
+    min-height: 47px;
     gap: 8px;
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .auth-options {
@@ -1523,5 +1619,71 @@ button:disabled {
 
   .check-option {
     font-size: 13px;
+  }
+}
+
+@media (max-width: 430px) and (max-height: 760px) {
+  .checkin-page {
+    min-height: 560px;
+  }
+
+  .checkin-shell {
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
+
+  .checkin-hero {
+    min-height: 204px;
+  }
+
+  .portal-skyline {
+    right: -44px;
+    top: 22px;
+    transform: scale(0.88);
+    transform-origin: top right;
+  }
+
+  .focus-mark {
+    width: 48px;
+    height: 52px;
+  }
+
+  .focus-logo-text strong {
+    font-size: 28px;
+  }
+
+  .focus-logo-text > span {
+    font-size: 11px;
+  }
+
+  .checkin-hero .hero-greeting {
+    margin-top: 24px;
+    font-size: 20px;
+  }
+
+  .checkin-hero h2 {
+    font-size: 25px;
+  }
+
+  .checkin-hero .hero-copy {
+    margin-top: 8px;
+    font-size: 14px;
+  }
+
+  .checkin-form {
+    gap: 14px;
+    padding: 14px 15px 15px;
+  }
+
+  .auth-form {
+    gap: 13px;
+  }
+
+  .auth-input-wrap .input {
+    min-height: 46px;
+  }
+
+  .checkin-form .btn.primary {
+    min-height: 50px;
   }
 }
