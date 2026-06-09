@@ -554,9 +554,7 @@ button:disabled {
 }
 
 .checkin-page {
-  display: grid;
   min-height: 100vh;
-  grid-template-rows: auto 1fr;
   background: linear-gradient(180deg, #f6f7f9 0%, #eef7f6 100%);
 }
 
@@ -564,8 +562,8 @@ button:disabled {
   display: grid;
   width: min(760px, 100%);
   margin: 0 auto;
-  padding: 32px 18px;
-  place-items: center;
+  padding: 12px 14px 24px;
+  place-items: start center;
 }
 
 .checkin-panel {
@@ -658,6 +656,10 @@ button:disabled {
   display: grid;
   gap: 10px;
   padding: 20px 22px 22px;
+}
+
+.scanner-card {
+  padding-top: 22px;
 }
 
 .success-mark,
@@ -764,6 +766,123 @@ button:disabled {
 
 .btn.wide {
   width: 100%;
+}
+
+.calendar-page {
+  min-height: 100vh;
+  background: #fff;
+}
+
+.calendar-page-shell {
+  min-height: 100vh;
+  padding: 20px 8px 96px;
+}
+
+.employee-calendar-view {
+  width: 100%;
+}
+
+.employee-calendar-header {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 24px;
+}
+
+.employee-calendar-header h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.calendar-nav-btn {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.calendar-page .calendar-wrap {
+  overflow: visible;
+  border-top: 0;
+}
+
+.calendar-page .calendar {
+  min-width: 0;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.calendar-page .weekday {
+  border-bottom: 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.calendar-page .weekday:first-child {
+  color: #e11d48;
+}
+
+.calendar-page .weekday:nth-child(7) {
+  color: #2563eb;
+}
+
+.calendar-page .day {
+  min-height: 112px;
+  border-right: 0;
+  border-bottom: 1px solid #edf0f3;
+  padding: 8px 5px;
+}
+
+.calendar-page .day.outside {
+  background: #fff;
+  color: #c7ccd5;
+}
+
+.calendar-page .day.today {
+  outline: 2px solid #22252d;
+  outline-offset: -2px;
+  background: #fff;
+}
+
+.calendar-page .day.checked-in {
+  background: #fff;
+}
+
+.calendar-page .day-number {
+  justify-content: center;
+  font-size: 17px;
+}
+
+.calendar-page .own-checkin {
+  min-height: 20px;
+  padding: 2px 3px;
+  background: #ecfdf5;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.floating-home-btn {
+  position: fixed;
+  right: 18px;
+  bottom: 22px;
+  z-index: 20;
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 50%;
+  background: #3f3f46;
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
+  font-size: 18px;
+  font-weight: 900;
 }
 
 .scan-tip {

@@ -12,7 +12,6 @@ let scanInFlight = false;
 let scannerModulePromise = null;
 let Html5QrcodeClass = null;
 let Html5QrcodeFormats = null;
-let deferredInstallPrompt = null;
 
 let state = {
   settings: { branchName: "FOCUS 지점", timezone: "Asia/Seoul" },
@@ -29,7 +28,6 @@ let state = {
   authMode: "login",
   auth: { status: "checking", token: "", employee: null },
   savedLogin: { employeeNo: "", password: "", rememberCredentials: false, autoLogin: false },
-  canInstallApp: false,
   scannerStatus: "idle",
   scannerError: "",
   pendingQrCode: "",
@@ -51,13 +49,17 @@ export function startApp(rootElement) {
   }
 
   supabase = createClient(url, anonKey);
-  registerServiceWorker();
   initializeSafely();
   return () => stopScanner({ rerender: false });
 }
 
-const route = () => (window.location.pathname === "/checkin" ? "checkin" : "dashboard");
+const route = () => {
+  if (window.location.pathname === "/calendar") return "calendar";
+  if (window.location.pathname === "/checkin") return "checkin";
+  return "dashboard";
+};
 const isCheckinRoute = () => route() === "checkin";
+const isEmployeeRoute = () => ["checkin", "calendar"].includes(route());
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -170,15 +172,6 @@ function disableSavedAutoLogin() {
   state.savedLogin = saved;
 }
 
-function isStandaloneApp() {
-  return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
-}
-
-function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("/service-worker.js").catch(() => undefined);
-}
-
 function activeEmployees() {
   return state.employees.filter((employee) => employee.active !== false);
 }
@@ -252,7 +245,7 @@ async function callRpc(name, args = {}) {
 
 async function loadState({ keepCheckIn = false } = {}) {
   let payload;
-  if (isCheckinRoute()) {
+  if (isEmployeeRoute()) {
     if (state.auth.employee) {
       payload = await callRpc("get_employee_state", { session_token_input: state.auth.token });
     } else {
@@ -469,11 +462,21 @@ function renderStats() {
 }
 
 function renderCalendarToolbar() {
-  const employeeView = isCheckinRoute();
+  const employeeView = isEmployeeRoute();
   const monthTitle = new Intl.DateTimeFormat("ko-KR", {
     year: "numeric",
     month: "long"
   }).format(state.monthCursor);
+
+  if (employeeView) {
+    return `
+      <div class="employee-calendar-header">
+        <button class="calendar-nav-btn" title="이전 달" data-action="prev-month">‹</button>
+        <h1>${escapeHtml(monthTitle.replace("년 ", ". ").replace("월", "."))}</h1>
+        <button class="calendar-nav-btn" title="다음 달" data-action="next-month">›</button>
+      </div>
+    `;
+  }
 
   return `
     <div class="panel-header calendar-toolbar">
@@ -506,7 +509,7 @@ function renderCalendarToolbar() {
 }
 
 function renderCalendar() {
-  const employeeView = isCheckinRoute();
+  const employeeView = isEmployeeRoute();
   const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
   const year = state.monthCursor.getFullYear();
   const month = state.monthCursor.getMonth();
@@ -521,7 +524,7 @@ function renderCalendar() {
   });
 
   return `
-    <section class="panel">
+    <section class="${employeeView ? "employee-calendar-view" : "panel"}">
       ${renderCalendarToolbar()}
       <div class="calendar-wrap">
         <div class="calendar">
@@ -535,7 +538,7 @@ function renderCalendar() {
                 "day",
                 day.getMonth() !== month ? "outside" : "",
                 key === todayKey ? "today" : "",
-                key === state.selectedDate ? "selected" : "",
+                !employeeView && key === state.selectedDate ? "selected" : "",
                 employeeView && records.length ? "checked-in" : ""
               ]
                 .filter(Boolean)
@@ -580,7 +583,7 @@ function renderCalendar() {
 
 function renderDetails() {
   const records = recordsForDate(state.selectedDate);
-  const employeeView = isCheckinRoute();
+  const employeeView = isEmployeeRoute();
   return `
     <section class="panel">
       <div class="panel-header">
@@ -727,8 +730,7 @@ function renderScannerPanel() {
     state.scannerStatus === "active" ? "카메라 스캔 중" : state.scannerStatus === "decoding" ? "QR 확인 중" : "QR 스캔";
 
   return `
-    <div class="status-box">
-      <div class="status-mark">QR</div>
+    <div class="status-box scanner-card">
       <h3 data-scan-title>${statusLabel}</h3>
       ${renderAccountLine()}
       <div id="qr-reader" class="qr-reader ${isWorking ? "" : "hidden"}"></div>
@@ -744,25 +746,12 @@ function renderScannerPanel() {
   `;
 }
 
-function renderEmployeeCalendar() {
-  return `
-    <div class="employee-calendar-stack">
-      ${renderCalendar()}
-      ${renderDetails()}
-    </div>
-  `;
-}
-
 function renderCheckinActions() {
   if (!state.auth.employee) return "";
 
   return `
     <div class="checkin-bottom-actions">
-      ${
-        state.canInstallApp && !isStandaloneApp()
-          ? `<button class="btn secondary wide" data-action="install-app">바로가기만들기</button>`
-          : ""
-      }
+      <button class="btn secondary wide" data-action="open-calendar">캘린더 보기</button>
       <button class="btn secondary wide" data-action="logout">로그아웃</button>
     </div>
   `;
@@ -772,7 +761,6 @@ function renderEmployeeHome(primaryPanel) {
   return `
     <div class="employee-home">
       ${primaryPanel}
-      ${renderEmployeeCalendar()}
       ${renderCheckinActions()}
     </div>
   `;
@@ -839,7 +827,6 @@ function renderCheckin() {
   const currentDate = state.today?.dateKey ? formatFullDate(state.today.dateKey) : "";
   app.innerHTML = `
     <div class="checkin-page">
-      ${renderTopbar()}
       <main class="checkin-shell">
         <section class="checkin-panel">
           <div class="checkin-hero">
@@ -853,8 +840,20 @@ function renderCheckin() {
   `;
 }
 
+function renderEmployeeCalendarPage() {
+  app.innerHTML = `
+    <div class="calendar-page">
+      <main class="calendar-page-shell">
+        ${state.auth.employee ? renderCalendar() : renderAuthPanel()}
+      </main>
+      <button class="floating-home-btn" data-action="go-home" title="홈">홈</button>
+    </div>
+  `;
+}
+
 function render() {
-  if (route() === "checkin") renderCheckin();
+  if (route() === "calendar") renderEmployeeCalendarPage();
+  else if (route() === "checkin") renderCheckin();
   else renderDashboard();
 }
 
@@ -1030,20 +1029,6 @@ async function maybeCompleteCheckIn(forcedQrCode = "") {
   }
 }
 
-async function installAppShortcut() {
-  if (!deferredInstallPrompt) {
-    showToast("이 브라우저에서는 바로가기 설치 버튼을 사용할 수 없습니다.");
-    return;
-  }
-
-  const promptEvent = deferredInstallPrompt;
-  deferredInstallPrompt = null;
-  state.canInstallApp = false;
-  promptEvent.prompt();
-  await promptEvent.userChoice.catch(() => undefined);
-  if (isCheckinRoute()) renderCheckin();
-}
-
 document.addEventListener("click", async (event) => {
   const target = event.target.closest("[data-action]");
   if (!target) return;
@@ -1064,19 +1049,19 @@ document.addEventListener("click", async (event) => {
     if (action === "prev-month" || action === "next-month") {
       const direction = action === "prev-month" ? -1 : 1;
       state.monthCursor = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() + direction, 1);
-      renderDashboard();
+      render();
     }
 
     if (action === "today") {
       const today = new Date();
       state.monthCursor = new Date(today.getFullYear(), today.getMonth(), 1);
       state.selectedDate = state.today?.dateKey || toDateKey(today);
-      renderDashboard();
+      render();
     }
 
     if (action === "select-date") {
       state.selectedDate = target.dataset.date;
-      renderDashboard();
+      render();
     }
 
     if (action === "auth-mode") {
@@ -1087,10 +1072,20 @@ document.addEventListener("click", async (event) => {
     if (action === "logout") {
       await stopScanner({ rerender: false });
       clearSession();
+      if (route() === "calendar") window.history.pushState({}, "", "/checkin");
       render();
     }
 
-    if (action === "install-app") await installAppShortcut();
+    if (action === "open-calendar") {
+      window.history.pushState({}, "", "/calendar");
+      renderEmployeeCalendarPage();
+    }
+
+    if (action === "go-home") {
+      window.history.pushState({}, "", "/checkin");
+      renderCheckin();
+    }
+
     if (action === "start-scanner") await startScanner();
     if (action === "stop-scanner") await stopScanner();
   } catch (error) {
@@ -1120,19 +1115,6 @@ document.addEventListener("input", (event) => {
   const form = event.target.closest('form[data-form="register"]');
   if (!form || !["password", "passwordConfirm"].includes(event.target.name)) return;
   updatePasswordConfirmState(form, { showError: Boolean(form.elements.passwordConfirm.value) });
-});
-
-window.addEventListener("beforeinstallprompt", (event) => {
-  event.preventDefault();
-  deferredInstallPrompt = event;
-  state.canInstallApp = true;
-  if (app && isCheckinRoute() && state.auth.employee) renderCheckin();
-});
-
-window.addEventListener("appinstalled", () => {
-  deferredInstallPrompt = null;
-  state.canInstallApp = false;
-  if (app && isCheckinRoute()) renderCheckin();
 });
 
 document.addEventListener("submit", async (event) => {
