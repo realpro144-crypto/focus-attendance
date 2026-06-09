@@ -1,4 +1,4 @@
-# FOCUS 지점 출근부
+# 포커스앱
 
 Vercel + Supabase 클라우드 배포용 출근부 앱입니다.
 

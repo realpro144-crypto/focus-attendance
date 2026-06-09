@@ -12,6 +12,7 @@ let scanInFlight = false;
 let scannerModulePromise = null;
 let Html5QrcodeClass = null;
 let Html5QrcodeFormats = null;
+let deferredInstallPrompt = null;
 
 let state = {
   settings: { branchName: "FOCUS 지점", timezone: "Asia/Seoul" },
@@ -28,6 +29,7 @@ let state = {
   authMode: "login",
   auth: { status: "checking", token: "", employee: null },
   savedLogin: { employeeNo: "", password: "", rememberCredentials: false, autoLogin: false },
+  canInstallApp: false,
   scannerStatus: "idle",
   scannerError: "",
   pendingQrCode: "",
@@ -49,11 +51,13 @@ export function startApp(rootElement) {
   }
 
   supabase = createClient(url, anonKey);
+  registerServiceWorker();
   initializeSafely();
   return () => stopScanner({ rerender: false });
 }
 
 const route = () => (window.location.pathname === "/checkin" ? "checkin" : "dashboard");
+const isCheckinRoute = () => route() === "checkin";
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -166,6 +170,15 @@ function disableSavedAutoLogin() {
   state.savedLogin = saved;
 }
 
+function isStandaloneApp() {
+  return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("/service-worker.js").catch(() => undefined);
+}
+
 function activeEmployees() {
   return state.employees.filter((employee) => employee.active !== false);
 }
@@ -206,6 +219,19 @@ function showToast(message) {
   window.setTimeout(() => toast.remove(), 2600);
 }
 
+function localCheckinPublicState() {
+  const now = new Date();
+  return {
+    settings: state.settings,
+    employees: [],
+    records: [],
+    today: {
+      dateKey: toDateKey(now),
+      localTime: new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }).format(now)
+    }
+  };
+}
+
 function renderConfigError() {
   app.innerHTML = `
     <div class="loading">
@@ -225,15 +251,32 @@ async function callRpc(name, args = {}) {
 }
 
 async function loadState({ keepCheckIn = false } = {}) {
-  const payload = await callRpc("get_public_state");
+  let payload;
+  if (isCheckinRoute()) {
+    if (state.auth.employee) {
+      payload = await callRpc("get_employee_state", { session_token_input: state.auth.token });
+    } else {
+      try {
+        payload = await callRpc("get_checkin_public_state");
+      } catch {
+        payload = localCheckinPublicState();
+      }
+    }
+  } else {
+    payload = await callRpc("get_public_state");
+  }
+
   const origin = window.location.origin;
   const checkInUrl = `${origin}/checkin`;
-  const wallQrUrl = `${origin}/checkin?qr=${encodeURIComponent(payload.attendanceCode)}`;
-  const qrDataUrl = await QRCode.toDataURL(wallQrUrl, {
-    errorCorrectionLevel: "M",
-    margin: 1,
-    width: 320
-  });
+  const attendanceCode = payload.attendanceCode ?? state.attendanceCode;
+  const wallQrUrl = attendanceCode ? `${origin}/checkin?qr=${encodeURIComponent(attendanceCode)}` : "";
+  const qrDataUrl = wallQrUrl
+    ? await QRCode.toDataURL(wallQrUrl, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        width: 320
+      })
+    : state.qrDataUrl;
 
   const checkInFields = keepCheckIn
     ? {
@@ -260,6 +303,7 @@ async function loadState({ keepCheckIn = false } = {}) {
     ...payload,
     checkInUrl,
     wallQrUrl,
+    attendanceCode,
     qrDataUrl,
     ...checkInFields
   };
@@ -318,8 +362,8 @@ function clearSession() {
 function renderTopbar() {
   const todayLabel = state.today?.dateKey ? formatFullDate(state.today.dateKey) : "";
   const checkinActions =
-    route() === "checkin"
-      ? `${state.auth.employee ? `<button class="btn secondary" data-action="logout">계정 변경</button>` : ""}`
+    isCheckinRoute()
+      ? ""
       : `<button class="btn secondary" data-action="refresh">새로고침</button>`;
 
   return `
@@ -327,8 +371,8 @@ function renderTopbar() {
       <div class="brand">
         <div class="brand-mark">QR</div>
         <div>
-          <h1>${escapeHtml(state.settings.branchName)} 출근 캘린더</h1>
-          <p>${escapeHtml(todayLabel)}</p>
+          <h1>포커스앱</h1>
+          <p>${escapeHtml(state.settings.branchName)} · ${escapeHtml(todayLabel)}</p>
         </div>
       </div>
       <div class="top-actions">${checkinActions}</div>
@@ -349,14 +393,9 @@ function renderQrPanel() {
           <span>인쇄해서 붙여둘 고정 QR입니다.</span>
           <span>Vercel 배포 후 HTTPS 주소로 표시됩니다.</span>
         </div>
-        <div class="code-box">
-          <span>수동 코드</span>
-          <strong>${escapeHtml(state.attendanceCode)}</strong>
-        </div>
         <div class="url-box">
           <div class="url-text">${escapeHtml(state.checkInUrl)}</div>
           <button class="btn primary" data-action="copy-url">휴대폰 주소 복사</button>
-          <button class="btn secondary" data-action="copy-wall-url">QR 내용 복사</button>
         </div>
       </div>
     </section>
@@ -430,6 +469,7 @@ function renderStats() {
 }
 
 function renderCalendarToolbar() {
+  const employeeView = isCheckinRoute();
   const monthTitle = new Intl.DateTimeFormat("ko-KR", {
     year: "numeric",
     month: "long"
@@ -442,24 +482,31 @@ function renderCalendarToolbar() {
         <button class="icon-btn" title="다음 달" data-action="next-month">›</button>
         <button class="btn secondary" data-action="today">오늘</button>
       </div>
-      <h2 class="month-title">${escapeHtml(monthTitle)}</h2>
-      <label class="field">
-        <span>지점원 필터</span>
-        <select class="select" data-action="employee-filter">
-          <option value="all"${state.employeeFilter === "all" ? " selected" : ""}>전체 지점원</option>
-          ${activeEmployees()
-            .map(
-              (employee) =>
-                `<option value="${employee.id}"${state.employeeFilter === employee.id ? " selected" : ""}>${escapeHtml(employee.name)} (${escapeHtml(employeeNoLabel(employee.employeeNo))})</option>`
-            )
-            .join("")}
-        </select>
-      </label>
+      <h2 class="month-title">${employeeView ? "내 출근 캘린더" : escapeHtml(monthTitle)}</h2>
+      ${
+        employeeView
+          ? `<span class="meta-line">${escapeHtml(monthTitle)}</span>`
+          : `
+            <label class="field">
+              <span>지점원 필터</span>
+              <select class="select" data-action="employee-filter">
+                <option value="all"${state.employeeFilter === "all" ? " selected" : ""}>전체 지점원</option>
+                ${activeEmployees()
+                  .map(
+                    (employee) =>
+                      `<option value="${employee.id}"${state.employeeFilter === employee.id ? " selected" : ""}>${escapeHtml(employee.name)} (${escapeHtml(employeeNoLabel(employee.employeeNo))})</option>`
+                  )
+                  .join("")}
+              </select>
+            </label>
+          `
+      }
     </div>
   `;
 }
 
 function renderCalendar() {
+  const employeeView = isCheckinRoute();
   const weekdayLabels = ["일", "월", "화", "수", "목", "금", "토"];
   const year = state.monthCursor.getFullYear();
   const month = state.monthCursor.getMonth();
@@ -488,7 +535,8 @@ function renderCalendar() {
                 "day",
                 day.getMonth() !== month ? "outside" : "",
                 key === todayKey ? "today" : "",
-                key === state.selectedDate ? "selected" : ""
+                key === state.selectedDate ? "selected" : "",
+                employeeView && records.length ? "checked-in" : ""
               ]
                 .filter(Boolean)
                 .join(" ");
@@ -497,21 +545,28 @@ function renderCalendar() {
                 <button class="${classes}" data-action="select-date" data-date="${key}">
                   <div class="day-number">
                     <span>${day.getDate()}</span>
-                    ${records.length ? `<span class="count-pill">${records.length}</span>` : ""}
+                    ${records.length && !employeeView ? `<span class="count-pill">${records.length}</span>` : ""}
                   </div>
                   <div class="record-list">
-                    ${visible
-                      .map(
-                        (record) => `
-                          <div class="record-pill">
-                            <span class="dot" style="background:${employeeColor(record.employeeId)}"></span>
-                            <span>${escapeHtml(record.employeeName)}</span>
-                            <time>${escapeHtml(record.localTime)}</time>
-                          </div>
-                        `
-                      )
-                      .join("")}
-                    ${records.length > visible.length ? `<div class="more">+${records.length - visible.length}명 더</div>` : ""}
+                    ${
+                      employeeView
+                        ? records
+                            .slice(0, 1)
+                            .map((record) => `<div class="own-checkin">출근 ${escapeHtml(record.localTime)}</div>`)
+                            .join("")
+                        : visible
+                            .map(
+                              (record) => `
+                                <div class="record-pill">
+                                  <span class="dot" style="background:${employeeColor(record.employeeId)}"></span>
+                                  <span>${escapeHtml(record.employeeName)}</span>
+                                  <time>${escapeHtml(record.localTime)}</time>
+                                </div>
+                              `
+                            )
+                            .join("")
+                    }
+                    ${!employeeView && records.length > visible.length ? `<div class="more">+${records.length - visible.length}명 더</div>` : ""}
                   </div>
                 </button>
               `;
@@ -525,11 +580,12 @@ function renderCalendar() {
 
 function renderDetails() {
   const records = recordsForDate(state.selectedDate);
+  const employeeView = isCheckinRoute();
   return `
     <section class="panel">
       <div class="panel-header">
         <h3>${escapeHtml(formatKoreanDate(state.selectedDate))}</h3>
-        <span class="meta-line">${records.length}명 출근</span>
+        <span class="meta-line">${employeeView ? (records.length ? "출근 완료" : "기록 없음") : `${records.length}명 출근`}</span>
       </div>
       <div class="panel-body">
         <div class="details-list">
@@ -541,15 +597,15 @@ function renderDetails() {
                       <div class="detail-row">
                         <span class="dot" style="background:${employeeColor(record.employeeId)}"></span>
                         <span>
-                          <span class="employee-name">${escapeHtml(record.employeeName)}</span>
-                          <span class="employee-meta">${escapeHtml(employeeNoLabel(record.employeeNo))}</span>
+                          <span class="employee-name">${employeeView ? "내 출근" : escapeHtml(record.employeeName)}</span>
+                          <span class="employee-meta">${employeeView ? escapeHtml(record.dateKey) : escapeHtml(employeeNoLabel(record.employeeNo))}</span>
                         </span>
                         <time class="time-text">${escapeHtml(record.localTime)}</time>
                       </div>
                     `
                   )
                   .join("")
-              : `<div class="empty">선택한 날짜에는 아직 출근 기록이 없습니다.</div>`
+              : `<div class="empty">${employeeView ? "선택한 날짜에는 출근 기록이 없습니다." : "선택한 날짜에는 아직 출근 기록이 없습니다."}</div>`
           }
         </div>
       </div>
@@ -674,28 +730,50 @@ function renderScannerPanel() {
     <div class="status-box">
       <div class="status-mark">QR</div>
       <h3 data-scan-title>${statusLabel}</h3>
-      <p>벽에 붙은 출근 QR을 스캔하면 출근 시간이 자동으로 기록됩니다.</p>
       ${renderAccountLine()}
       <div id="qr-reader" class="qr-reader ${isWorking ? "" : "hidden"}"></div>
-      <div id="qr-file-reader" class="qr-file-reader"></div>
-      <input class="visually-hidden" data-action="qr-file" type="file" accept="image/*" capture="environment" />
-      <div class="scan-tip">QR이 스캔 박스 안에 크게 들어오도록 맞추고 1~2초 정도 멈춰 주세요.</div>
       ${state.scannerError ? `<div class="notice error-notice">${escapeHtml(state.scannerError)}</div>` : ""}
       <div class="scan-actions">
         ${
           state.scannerStatus === "active" || state.scannerStatus === "starting"
             ? `<button class="btn secondary" data-scan-button data-action="stop-scanner">스캔 중지</button>`
-            : `<button class="btn primary" data-scan-button data-action="start-scanner">카메라로 QR 스캔</button>`
+            : `<button class="btn primary" data-scan-button data-action="start-scanner">QR스캔 출근</button>`
         }
-        <button class="btn secondary" data-action="open-file-scanner">사진으로 QR 스캔</button>
       </div>
-      <form class="manual-code-form" data-form="manual-qr">
-        <label class="field">
-          <span>수동 코드</span>
-          <input class="input" name="qrCode" autocomplete="off" placeholder="수동 코드를 입력해 주세요" />
-        </label>
-        <button class="btn secondary" type="submit">코드로 출근</button>
-      </form>
+    </div>
+  `;
+}
+
+function renderEmployeeCalendar() {
+  return `
+    <div class="employee-calendar-stack">
+      ${renderCalendar()}
+      ${renderDetails()}
+    </div>
+  `;
+}
+
+function renderCheckinActions() {
+  if (!state.auth.employee) return "";
+
+  return `
+    <div class="checkin-bottom-actions">
+      ${
+        state.canInstallApp && !isStandaloneApp()
+          ? `<button class="btn secondary wide" data-action="install-app">바로가기만들기</button>`
+          : ""
+      }
+      <button class="btn secondary wide" data-action="logout">로그아웃</button>
+    </div>
+  `;
+}
+
+function renderEmployeeHome(primaryPanel) {
+  return `
+    <div class="employee-home">
+      ${primaryPanel}
+      ${renderEmployeeCalendar()}
+      ${renderCheckinActions()}
     </div>
   `;
 }
@@ -714,18 +792,18 @@ function renderCheckinBody() {
   if (!state.auth.employee) return renderAuthPanel();
 
   if (state.checkInStatus === "processing") {
-    return `
+    return renderEmployeeHome(`
       <div class="status-box">
         <div class="status-mark">...</div>
         <h3>출근 기록 중</h3>
         <p>스캔한 QR을 확인하고 있습니다.</p>
         ${renderAccountLine()}
       </div>
-    `;
+    `);
   }
 
   if (state.checkInStatus === "error") {
-    return `
+    return renderEmployeeHome(`
       <div class="status-box error-box">
         <div class="status-mark">!</div>
         <h3>출근 기록 실패</h3>
@@ -735,7 +813,7 @@ function renderCheckinBody() {
           <button class="btn primary" data-action="start-scanner">다시 스캔</button>
         </div>
       </div>
-    `;
+    `);
   }
 
   if (state.checkInStatus === "success" && state.lastCheckIn) {
@@ -744,17 +822,17 @@ function renderCheckinBody() {
       ? "오늘은 이미 출근 기록이 있어 기존 시간을 보여드립니다."
       : "출근 시간이 캘린더에 기록되었습니다.";
 
-    return `
+    return renderEmployeeHome(`
       <div class="success-box">
         <div class="success-mark">✓</div>
         <h3>${escapeHtml(result.record.employeeName)}님 ${escapeHtml(result.record.localTime)}</h3>
         <p>${message}</p>
         ${renderAccountLine()}
       </div>
-    `;
+    `);
   }
 
-  return renderScannerPanel();
+  return renderEmployeeHome(renderScannerPanel());
 }
 
 function renderCheckin() {
@@ -765,8 +843,8 @@ function renderCheckin() {
       <main class="checkin-shell">
         <section class="checkin-panel">
           <div class="checkin-hero">
-            <h2>${escapeHtml(state.settings.branchName)} 출근</h2>
-            <p>${escapeHtml(currentDate)} · QR 스캔</p>
+            <h2>포커스앱 출근</h2>
+            <p>${escapeHtml(state.settings.branchName)} · ${escapeHtml(currentDate)}</p>
           </div>
           ${renderCheckinBody()}
         </section>
@@ -788,11 +866,6 @@ async function refresh({ keepCheckIn = false } = {}) {
 
 function cameraNeedsFallback() {
   return !window.isSecureContext || !navigator.mediaDevices?.getUserMedia;
-}
-
-function clickFileScanner() {
-  const input = document.querySelector('[data-action="qr-file"]');
-  input?.click();
 }
 
 async function ensureScannerModule() {
@@ -874,9 +947,8 @@ async function startScanner() {
 
   if (cameraNeedsFallback()) {
     state.scannerError =
-      "이 브라우저에서는 실시간 스캔이 제한될 수 있습니다. 카메라가 열리면 QR을 화면 안에 크게 맞춘 뒤 촬영 또는 확인을 눌러주세요.";
+      "이 브라우저에서는 카메라 스캔이 제한됩니다. HTTPS 주소로 접속했는지 확인해 주세요.";
     renderCheckin();
-    window.setTimeout(clickFileScanner, 80);
     return;
   }
 
@@ -902,9 +974,8 @@ async function startScanner() {
     await clearScannerInstance();
     state.scannerStatus = "idle";
     state.scannerError =
-      "실시간 스캔을 시작하지 못했습니다. 카메라가 열리면 QR을 화면 안에 크게 맞춘 뒤 촬영 또는 확인을 눌러주세요.";
+      "카메라를 시작하지 못했습니다. 브라우저의 카메라 권한을 허용해 주세요.";
     renderCheckin();
-    window.setTimeout(clickFileScanner, 80);
   }
 }
 
@@ -912,25 +983,6 @@ async function stopScanner({ rerender = true } = {}) {
   await clearScannerInstance();
   state.scannerStatus = "idle";
   if (rerender) renderCheckin();
-}
-
-async function scanQrFile(file) {
-  if (!file) return;
-  state.scannerStatus = "decoding";
-  state.scannerError = "";
-  renderCheckin();
-
-  try {
-    await ensureScannerModule();
-    const imageScanner = new Html5QrcodeClass("qr-file-reader");
-    const decodedText = await imageScanner.scanFile(file, true);
-    await imageScanner.clear();
-    await handleScannedQr(decodedText);
-  } catch {
-    state.scannerStatus = "idle";
-    state.scannerError = "QR을 읽지 못했습니다. 더 밝게 맞춰 다시 스캔해 주세요.";
-    renderCheckin();
-  }
 }
 
 async function handleScannedQr(rawText) {
@@ -978,6 +1030,20 @@ async function maybeCompleteCheckIn(forcedQrCode = "") {
   }
 }
 
+async function installAppShortcut() {
+  if (!deferredInstallPrompt) {
+    showToast("이 브라우저에서는 바로가기 설치 버튼을 사용할 수 없습니다.");
+    return;
+  }
+
+  const promptEvent = deferredInstallPrompt;
+  deferredInstallPrompt = null;
+  state.canInstallApp = false;
+  promptEvent.prompt();
+  await promptEvent.userChoice.catch(() => undefined);
+  if (isCheckinRoute()) renderCheckin();
+}
+
 document.addEventListener("click", async (event) => {
   const target = event.target.closest("[data-action]");
   if (!target) return;
@@ -993,11 +1059,6 @@ document.addEventListener("click", async (event) => {
     if (action === "copy-url") {
       await navigator.clipboard.writeText(state.checkInUrl);
       showToast("휴대폰 접속 주소를 복사했습니다.");
-    }
-
-    if (action === "copy-wall-url") {
-      await navigator.clipboard.writeText(state.wallQrUrl);
-      showToast("벽 QR 내용을 복사했습니다.");
     }
 
     if (action === "prev-month" || action === "next-month") {
@@ -1029,9 +1090,9 @@ document.addEventListener("click", async (event) => {
       render();
     }
 
+    if (action === "install-app") await installAppShortcut();
     if (action === "start-scanner") await startScanner();
     if (action === "stop-scanner") await stopScanner();
-    if (action === "open-file-scanner") clickFileScanner();
   } catch (error) {
     showToast(error.message);
   }
@@ -1053,17 +1114,25 @@ document.addEventListener("change", async (event) => {
     renderDashboard();
   }
 
-  if (event.target.dataset.action === "qr-file") {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    await scanQrFile(file);
-  }
 });
 
 document.addEventListener("input", (event) => {
   const form = event.target.closest('form[data-form="register"]');
   if (!form || !["password", "passwordConfirm"].includes(event.target.name)) return;
   updatePasswordConfirmState(form, { showError: Boolean(form.elements.passwordConfirm.value) });
+});
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  state.canInstallApp = true;
+  if (app && isCheckinRoute() && state.auth.employee) renderCheckin();
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  state.canInstallApp = false;
+  if (app && isCheckinRoute()) renderCheckin();
 });
 
 document.addEventListener("submit", async (event) => {
@@ -1121,14 +1190,6 @@ document.addEventListener("submit", async (event) => {
       showToast("로그인되었습니다.");
     }
 
-    if (form.dataset.form === "manual-qr") {
-      const qrCode = String(data.qrCode || "").trim();
-      if (!qrCode) {
-        showToast("수동 코드를 입력해 주세요.");
-        return;
-      }
-      await maybeCompleteCheckIn(qrCode);
-    }
   } catch (error) {
     showToast(error.message);
   }
@@ -1136,8 +1197,8 @@ document.addEventListener("submit", async (event) => {
 
 async function initialize() {
   renderLoading();
-  await loadState({ keepCheckIn: true });
   await loadAuth();
+  await loadState({ keepCheckIn: true });
   render();
   await maybeCompleteCheckIn();
 }

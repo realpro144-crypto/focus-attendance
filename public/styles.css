@@ -457,6 +457,10 @@ button:disabled {
   outline-offset: -3px;
 }
 
+.day.checked-in {
+  background: #eefaf6;
+}
+
 .day-number {
   display: flex;
   align-items: center;
@@ -512,6 +516,20 @@ button:disabled {
   font-size: 12px;
 }
 
+.own-checkin {
+  display: inline-flex;
+  width: 100%;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
 .details-list {
   display: grid;
   gap: 8px;
@@ -544,7 +562,7 @@ button:disabled {
 
 .checkin-shell {
   display: grid;
-  width: min(520px, 100%);
+  width: min(760px, 100%);
   margin: 0 auto;
   padding: 32px 18px;
   place-items: center;
@@ -711,6 +729,43 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.scan-actions .btn {
+  width: 100%;
+}
+
+.employee-home {
+  display: grid;
+  gap: 14px;
+}
+
+.employee-calendar-stack {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.employee-calendar-stack .panel {
+  box-shadow: none;
+}
+
+.checkin-page .day {
+  min-height: 82px;
+}
+
+.checkin-page .record-list {
+  margin-top: 6px;
+}
+
+.checkin-bottom-actions {
+  display: grid;
+  gap: 8px;
+  padding: 0 22px 22px;
+}
+
+.btn.wide {
+  width: 100%;
+}
+
 .scan-tip {
   padding: 10px 12px;
   border: 1px solid var(--line);
@@ -743,8 +798,7 @@ button:disabled {
 }
 
 .qr-reader.hidden,
-.hidden,
-.qr-file-reader {
+.hidden {
   display: none;
 }
 
