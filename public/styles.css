@@ -15,7 +15,7 @@
   --red-soft: #fee2e2;
   --yellow-soft: #fff3c4;
   --shadow: 0 18px 42px rgba(23, 32, 51, 0.08);
-  font-family: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  font-family: Pretendard, "Noto Sans KR", system-ui, sans-serif;
 }
 
 * {
@@ -682,10 +682,7 @@ button:disabled {
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
-  background:
-    radial-gradient(circle at 84% 5%, rgba(126, 202, 222, 0.34), transparent 30%),
-    radial-gradient(circle at 15% 86%, rgba(11, 144, 129, 0.28), transparent 36%),
-    linear-gradient(152deg, #041927 0%, #07303a 47%, #003b3b 100%);
+  background: linear-gradient(180deg, #022330 0%, #063847 50%, #052f3e 100%);
 }
 
 .checkin-page::-webkit-scrollbar {
@@ -699,20 +696,21 @@ button:disabled {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 52% 22%, rgba(255, 255, 255, 0.08), transparent 34%),
-    linear-gradient(180deg, rgba(3, 13, 25, 0.02) 0%, rgba(0, 20, 30, 0.18) 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0) 34%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, 0.12) 100%);
   opacity: 1;
 }
 
 .checkin-shell {
   position: relative;
   z-index: 1;
-  display: grid;
-  width: min(430px, 100%);
+  display: flex;
+  width: min(440px, 100%);
   min-height: 100%;
   margin: 0 auto;
-  padding: 22px 18px 16px;
-  place-items: start center;
+  padding: 28px 18px 18px;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .checkin-panel {
@@ -722,54 +720,23 @@ button:disabled {
 
 .checkin-hero {
   position: relative;
-  min-height: 238px;
-  padding: 4px 4px 14px;
+  min-height: 274px;
+  padding: 4px 4px 22px;
   color: #fff;
 }
 
 .portal-skyline {
   position: absolute;
-  right: -30px;
-  top: 28px;
+  right: -76px;
+  top: -2px;
   z-index: 0;
-  width: 214px;
-  height: 252px;
-  opacity: 0.58;
-  filter: drop-shadow(-18px 18px 26px rgba(0, 0, 0, 0.28));
-}
-
-.portal-skyline::before,
-.portal-skyline::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  border: 1px solid rgba(164, 223, 232, 0.14);
-}
-
-.portal-skyline::before {
-  right: 42px;
-  width: 142px;
-  height: 238px;
-  background:
-    linear-gradient(124deg, rgba(211, 245, 251, 0.22) 0%, transparent 18%),
-    linear-gradient(160deg, rgba(79, 141, 163, 0.42) 0%, rgba(12, 56, 77, 0.64) 54%, rgba(2, 25, 43, 0.88) 100%),
-    repeating-linear-gradient(90deg, transparent 0 14px, rgba(206, 247, 251, 0.2) 14px 15px),
-    repeating-linear-gradient(0deg, transparent 0 13px, rgba(206, 247, 251, 0.15) 13px 14px);
-  background-blend-mode: screen, normal, screen, screen;
-  clip-path: polygon(45% 0, 100% 17%, 100% 100%, 0 100%, 0 31%);
-}
-
-.portal-skyline::after {
-  right: 8px;
-  width: 76px;
-  height: 206px;
-  background:
-    linear-gradient(105deg, rgba(120, 202, 215, 0.25), transparent 22%),
-    linear-gradient(153deg, rgba(29, 91, 112, 0.58), rgba(3, 31, 51, 0.82)),
-    repeating-linear-gradient(90deg, transparent 0 13px, rgba(191, 237, 244, 0.17) 13px 14px),
-    repeating-linear-gradient(0deg, transparent 0 12px, rgba(191, 237, 244, 0.12) 12px 13px);
-  background-blend-mode: screen, normal, screen, screen;
-  clip-path: polygon(0 9%, 100% 24%, 100% 100%, 0 100%);
+  width: min(360px, 92vw);
+  height: 288px;
+  opacity: 0.2;
+  background: url("/assets/login/building-login.png") top right / contain no-repeat;
+  filter: saturate(0.9) contrast(1.06);
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 
 .focus-brand {
@@ -777,114 +744,37 @@ button:disabled {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
   margin-top: 0;
 }
 
-.focus-mark {
-  position: relative;
-  width: 60px;
-  height: 64px;
-  filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.28));
-}
-
-.focus-mark-piece {
-  position: absolute;
+.focus-logo {
   display: block;
-  transform: skewY(-18deg);
-}
-
-.mark-stem {
-  left: 4px;
-  top: 12px;
-  width: 21px;
-  height: 48px;
-  border-radius: 4px 0 0 5px;
-  background: linear-gradient(180deg, #cafff3 0%, #52efe0 28%, #139a9d 100%);
-  clip-path: polygon(0 15%, 100% 0, 100% 100%, 0 82%);
-}
-
-.mark-top {
-  left: 19px;
-  top: 6px;
-  width: 41px;
-  height: 17px;
-  border-radius: 3px 7px 3px 3px;
-  background: linear-gradient(135deg, #61f5e4 0%, #21cabd 54%, #0a8b92 100%);
-  clip-path: polygon(0 0, 100% 0, 84% 100%, 0 100%);
-}
-
-.mark-mid {
-  left: 17px;
-  top: 31px;
-  width: 34px;
-  height: 15px;
-  border-radius: 3px;
-  background: linear-gradient(135deg, #55ecd8 0%, #12b4a9 65%, #087c83 100%);
-  clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%);
-}
-
-.focus-mark::after {
-  content: "";
-  position: absolute;
-  left: 9px;
-  top: 13px;
-  width: 20px;
-  height: 48px;
-  background: linear-gradient(180deg, rgba(0, 72, 86, 0.34), transparent 60%);
-  clip-path: polygon(0 15%, 100% 0, 100% 100%, 0 82%);
-  transform: skewY(-18deg);
-  mix-blend-mode: multiply;
-}
-
-.focus-logo-text {
-  display: grid;
-  gap: 4px;
-}
-
-.focus-logo-text strong {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: #f8fbff;
-  font-size: 34px;
-  line-height: 1;
-  letter-spacing: 0;
-  font-weight: 650;
-  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
-}
-
-.focus-logo-text strong span {
-  display: inline-block;
-  min-width: 0.66em;
-  text-align: center;
-}
-
-.focus-logo-text > span {
-  color: #44ead7;
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0;
+  width: 148px;
+  max-width: 48vw;
+  height: auto;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.22));
 }
 
 .checkin-hero h2 {
   position: relative;
   z-index: 1;
-  max-width: 310px;
-  margin: 6px 0 0;
-  color: #fff;
-  font-size: 29px;
-  line-height: 1.18;
+  max-width: 320px;
+  margin: 8px 0 0;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.22;
 }
 
 .checkin-hero .hero-greeting {
   position: relative;
   z-index: 1;
-  margin: 38px 0 0;
-  color: #48ead8;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.15;
+  margin: 54px 0 0;
+  color: #20e5d0;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .checkin-hero .hero-copy {
@@ -892,9 +782,10 @@ button:disabled {
   z-index: 1;
   max-width: 300px;
   margin: 12px 0 0;
-  color: rgba(238, 250, 252, 0.78);
+  color: #c5d0d7;
   font-size: 15px;
-  line-height: 1.5;
+  font-weight: 400;
+  line-height: 1.55;
 }
 
 .hero-account {
@@ -936,154 +827,126 @@ button:disabled {
   position: relative;
   z-index: 2;
   display: grid;
-  gap: 18px;
-  padding: 17px 18px 18px;
-  border: 1px solid rgba(230, 236, 244, 0.92);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow:
-    0 22px 54px rgba(4, 20, 34, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  gap: 20px;
+  padding: 20px;
+  border: 0;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.18);
 }
 
 .auth-form {
   display: grid;
-  gap: 16px;
+  gap: 17px;
 }
 
 .auth-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .check-option {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
-  color: #425169;
+  gap: 8px;
+  min-width: 0;
+  color: #4f5b63;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .check-option input {
-  width: 19px;
-  height: 19px;
-  accent-color: var(--accent);
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.check-box-visual {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid #dce3ea;
+  border-radius: 7px;
+  background: #ffffff;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.check-box-visual img {
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+}
+
+.check-option input:checked + .check-box-visual {
+  border-color: #007d74;
+  background: #007d74;
+  box-shadow: 0 5px 12px rgba(0, 125, 116, 0.2);
+}
+
+.check-option input:checked + .check-box-visual img {
+  opacity: 1;
 }
 
 .segmented {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-  padding: 5px;
+  gap: 6px;
+  padding: 6px;
   border: 0;
-  border-radius: 13px;
-  background: linear-gradient(180deg, #f5f7fb 0%, #eef2f7 100%);
+  border-radius: 18px;
+  background: #f3f5f7;
 }
 
 .segmented button {
   display: inline-flex;
-  min-height: 48px;
+  min-height: 52px;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  border-radius: 11px;
-  background: transparent;
-  color: #27364b;
-  font-weight: 900;
+  gap: 8px;
+  border-radius: 15px;
+  background: #f3f5f7;
+  color: #394650;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .segmented button.active {
   background: #fff;
-  color: #081f2c;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  color: #0d2430;
+  box-shadow: 0 10px 24px rgba(13, 36, 48, 0.1);
 }
 
 .segmented button.active::after {
   content: "";
   position: absolute;
-  bottom: 3px;
-  width: 64px;
-  height: 3px;
+  bottom: 0;
+  width: 58px;
+  height: 4px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #006b66, #25c7b4);
+  background: #007d74;
 }
 
 .segmented button {
   position: relative;
 }
 
-.tab-icon,
-.input-icon {
-  position: relative;
-  display: inline-block;
+.tab-icon {
+  display: block;
   flex: 0 0 auto;
-}
-
-.tab-icon-user,
-.icon-id,
-.icon-user {
   width: 22px;
   height: 22px;
-}
-
-.tab-icon-user::before,
-.icon-id::before,
-.icon-user::before {
-  content: "";
-  position: absolute;
-  left: 7px;
-  top: 2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.tab-icon-user::after,
-.icon-id::after,
-.icon-user::after {
-  content: "";
-  position: absolute;
-  left: 3px;
-  bottom: 2px;
-  width: 16px;
-  height: 9px;
-  border: 0;
-  border-radius: 10px 10px 4px 4px;
-  background: currentColor;
-}
-
-.tab-icon-team {
-  width: 26px;
-  height: 22px;
-}
-
-.tab-icon-team::before {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 12px 0 0 currentColor;
-}
-
-.tab-icon-team::after {
-  content: "";
-  position: absolute;
-  left: 1px;
-  bottom: 3px;
-  width: 12px;
-  height: 8px;
-  border-radius: 9px 9px 4px 4px;
-  background: currentColor;
-  box-shadow: 12px 0 0 currentColor;
+  object-fit: contain;
 }
 
 .auth-input-wrap {
@@ -1092,61 +955,33 @@ button:disabled {
 }
 
 .auth-input-wrap .input {
-  min-height: 50px;
-  border-color: #cad3df;
-  border-radius: 11px;
-  padding-left: 48px;
+  min-height: 54px;
+  border-color: #dce3ea;
+  border-radius: 15px;
+  background: #ffffff;
+  padding-left: 50px;
   color: #172033;
   font-size: 15px;
 }
 
 .auth-input-wrap .input::placeholder {
-  color: #8a94a6;
+  color: #a6afb8;
 }
 
 .auth-input-wrap .input:focus {
-  border-color: #0f766e;
-  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+  border-color: #007d74;
+  box-shadow: 0 0 0 4px rgba(0, 125, 116, 0.12);
 }
 
-.input-icon {
+.input-icon-img {
   position: absolute;
-  left: 16px;
+  left: 17px;
   top: 50%;
   z-index: 1;
-  color: #0f766e;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
   transform: translateY(-50%);
-}
-
-.icon-lock {
-  width: 22px;
-  height: 24px;
-}
-
-.icon-lock::before {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 0;
-  width: 14px;
-  height: 13px;
-  border: 2.5px solid currentColor;
-  border-bottom: 0;
-  border-radius: 10px 10px 0 0;
-}
-
-.icon-lock::after {
-  content: "";
-  position: absolute;
-  left: 2px;
-  bottom: 1px;
-  width: 18px;
-  height: 15px;
-  border: 2.5px solid currentColor;
-  border-radius: 5px;
-  background:
-    radial-gradient(circle at 50% 43%, currentColor 0 2px, transparent 2.5px),
-    linear-gradient(currentColor, currentColor) center 10px / 2px 5px no-repeat;
 }
 
 .checkin-form .field {
@@ -1154,24 +989,63 @@ button:disabled {
 }
 
 .checkin-form .field > span:first-child {
-  color: #3b465a;
+  color: #4f5b63;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .checkin-form .btn.primary {
-  min-height: 54px;
-  border-radius: 11px;
-  background:
-    radial-gradient(circle at 52% 10%, rgba(255, 255, 255, 0.16), transparent 26%),
-    linear-gradient(135deg, #005f66 0%, #008574 55%, #00635f 100%);
-  box-shadow: 0 12px 24px rgba(0, 117, 102, 0.28);
+  min-height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #007d74 0%, #00978b 100%);
+  box-shadow: 0 14px 28px rgba(0, 125, 116, 0.28);
+  color: #ffffff;
   font-size: 17px;
-  font-weight: 950;
+  font-weight: 700;
 }
 
 .checkin-form .btn.primary:hover {
-  background: linear-gradient(135deg, #005458 0%, #007465 55%, #005753 100%);
+  background: linear-gradient(135deg, #006d66 0%, #008d82 100%);
+}
+
+.forgot-password {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+  color: #8a95a1;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.forgot-password > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.forgot-password img {
+  display: block;
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  object-fit: contain;
+}
+
+.forgot-password .forgot-arrow {
+  width: 16px;
+  height: 16px;
+}
+
+.forgot-password span span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .success-box {
@@ -1570,45 +1444,32 @@ button:disabled {
 
 @media (max-width: 430px) {
   .checkin-shell {
-    padding: 20px 14px 14px;
+    padding: 24px 16px 16px;
   }
 
   .checkin-hero {
-    min-height: 232px;
+    min-height: 270px;
   }
 
-  .focus-brand {
-    gap: 12px;
-  }
-
-  .focus-mark {
-    width: 54px;
-    height: 58px;
-  }
-
-  .focus-logo-text strong {
-    font-size: 31px;
-  }
-
-  .focus-logo-text > span {
-    font-size: 12px;
+  .focus-logo {
+    width: 140px;
   }
 
   .checkin-hero .hero-greeting {
-    margin-top: 34px;
-    font-size: 22px;
+    margin-top: 52px;
+    font-size: 21px;
   }
 
   .checkin-hero h2 {
-    font-size: 28px;
+    font-size: 27px;
   }
 
   .checkin-form {
-    padding: 16px 16px 17px;
+    padding: 19px 18px 18px;
   }
 
   .segmented button {
-    min-height: 47px;
+    min-height: 50px;
     gap: 8px;
     font-size: 14px;
   }
@@ -1624,45 +1485,36 @@ button:disabled {
 
 @media (max-width: 430px) and (max-height: 760px) {
   .checkin-page {
-    min-height: 560px;
+    min-height: 640px;
   }
 
   .checkin-shell {
-    padding-top: 12px;
-    padding-bottom: 10px;
+    padding-top: 18px;
+    padding-bottom: 12px;
   }
 
   .checkin-hero {
-    min-height: 204px;
+    min-height: 238px;
   }
 
   .portal-skyline {
-    right: -44px;
-    top: 22px;
-    transform: scale(0.88);
-    transform-origin: top right;
+    right: -86px;
+    top: -18px;
+    width: min(330px, 94vw);
+    height: 258px;
   }
 
-  .focus-mark {
-    width: 48px;
-    height: 52px;
-  }
-
-  .focus-logo-text strong {
-    font-size: 28px;
-  }
-
-  .focus-logo-text > span {
-    font-size: 11px;
+  .focus-logo {
+    width: 132px;
   }
 
   .checkin-hero .hero-greeting {
-    margin-top: 24px;
-    font-size: 20px;
+    margin-top: 38px;
+    font-size: 19px;
   }
 
   .checkin-hero h2 {
-    font-size: 25px;
+    font-size: 24px;
   }
 
   .checkin-hero .hero-copy {
@@ -1672,7 +1524,7 @@ button:disabled {
 
   .checkin-form {
     gap: 14px;
-    padding: 14px 15px 15px;
+    padding: 16px 16px 16px;
   }
 
   .auth-form {
@@ -1680,10 +1532,27 @@ button:disabled {
   }
 
   .auth-input-wrap .input {
-    min-height: 46px;
+    min-height: 50px;
   }
 
   .checkin-form .btn.primary {
-    min-height: 50px;
+    min-height: 52px;
+  }
+}
+
+@media (min-width: 720px) {
+  .checkin-shell {
+    width: min(470px, 100%);
+    padding-top: 42px;
+  }
+
+  .checkin-hero {
+    min-height: 294px;
+  }
+
+  .portal-skyline {
+    right: -118px;
+    width: 440px;
+    height: 330px;
   }
 }

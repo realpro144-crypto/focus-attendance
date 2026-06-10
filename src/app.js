@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 const AUTH_STORAGE_KEY = "focusAttendanceSession";
 const SAVED_LOGIN_STORAGE_KEY = "focusAttendanceSavedLogin";
 const colors = ["#0f766e", "#2563eb", "#9333ea", "#d97706", "#db2777", "#16a34a", "#475569", "#dc2626"];
+const loginAssetsPath = "/assets/login";
 
 let app = null;
 let supabase = null;
@@ -756,11 +757,11 @@ function renderAuthPanel() {
     <div class="checkin-form">
       <div class="segmented" role="tablist" aria-label="로그인 방식">
         <button class="${!isRegister ? "active" : ""}" data-action="auth-mode" data-mode="login" type="button">
-          <span class="tab-icon tab-icon-user" aria-hidden="true"></span>
+          <img class="tab-icon" src="${loginAssetsPath}/icon-login-user.svg" alt="" aria-hidden="true" />
           <span>로그인</span>
         </button>
         <button class="${isRegister ? "active" : ""}" data-action="auth-mode" data-mode="register" type="button">
-          <span class="tab-icon tab-icon-team" aria-hidden="true"></span>
+          <img class="tab-icon" src="${loginAssetsPath}/icon-register-users.svg" alt="" aria-hidden="true" />
           <span>지점원 등록</span>
         </button>
       </div>
@@ -771,7 +772,7 @@ function renderAuthPanel() {
               <label class="field">
                 <span>이름</span>
                 <span class="auth-input-wrap">
-                  <span class="input-icon icon-user" aria-hidden="true"></span>
+                  <img class="input-icon-img" src="${loginAssetsPath}/icon-input-user.svg" alt="" aria-hidden="true" />
                   <input class="input" name="name" autocomplete="name" placeholder="이름을 입력하세요" required />
                 </span>
               </label>
@@ -781,7 +782,7 @@ function renderAuthPanel() {
         <label class="field">
           <span>사번</span>
           <span class="auth-input-wrap">
-            <span class="input-icon icon-id" aria-hidden="true"></span>
+            <img class="input-icon-img" src="${loginAssetsPath}/icon-input-user.svg" alt="" aria-hidden="true" />
             <input class="input" name="employeeNo" autocomplete="username" inputmode="text" placeholder="사번을 입력하세요" value="${
               !isRegister ? escapeHtml(saved.employeeNo) : ""
             }" required />
@@ -790,7 +791,7 @@ function renderAuthPanel() {
         <label class="field">
           <span>비밀번호</span>
           <span class="auth-input-wrap">
-            <span class="input-icon icon-lock" aria-hidden="true"></span>
+            <img class="input-icon-img" src="${loginAssetsPath}/icon-lock.svg" alt="" aria-hidden="true" />
             <input class="input" name="password" type="password" autocomplete="${isRegister ? "new-password" : "current-password"}" placeholder="비밀번호를 입력하세요" value="${
               !isRegister ? escapeHtml(saved.password) : ""
             }" required />
@@ -802,7 +803,7 @@ function renderAuthPanel() {
               <label class="field">
                 <span>비밀번호 확인</span>
                 <span class="auth-input-wrap">
-                  <span class="input-icon icon-lock" aria-hidden="true"></span>
+                  <img class="input-icon-img" src="${loginAssetsPath}/icon-lock.svg" alt="" aria-hidden="true" />
                   <input class="input" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="비밀번호를 다시 입력하세요" data-password-confirm aria-describedby="password-confirm-error" required />
                 </span>
                 <small id="password-confirm-error" class="field-error hidden" data-password-error>비밀번호가 일치하지 않습니다.</small>
@@ -812,13 +813,26 @@ function renderAuthPanel() {
               <div class="auth-options">
                 <label class="check-option">
                   <input type="checkbox" name="rememberCredentials" data-login-option="remember" ${saved.rememberCredentials ? "checked" : ""} />
+                  <span class="check-box-visual" aria-hidden="true">
+                    <img src="${loginAssetsPath}/icon-check.svg" alt="" />
+                  </span>
                   <span>아이디/비밀번호 저장</span>
                 </label>
                 <label class="check-option">
                   <input type="checkbox" name="autoLogin" data-login-option="auto" ${saved.autoLogin ? "checked" : ""} />
+                  <span class="check-box-visual" aria-hidden="true">
+                    <img src="${loginAssetsPath}/icon-check.svg" alt="" />
+                  </span>
                   <span>자동 로그인</span>
                 </label>
               </div>
+              <button class="forgot-password" type="button" data-action="password-help">
+                <span>
+                  <img src="${loginAssetsPath}/icon-help-lock.svg" alt="" aria-hidden="true" />
+                  <span>비밀번호를 잊으셨나요?</span>
+                </span>
+                <img class="forgot-arrow" src="${loginAssetsPath}/icon-arrow-right.svg" alt="" aria-hidden="true" />
+              </button>
             `
         }
         <button class="btn primary" type="submit">${isRegister ? "등록" : "로그인"}</button>
@@ -958,21 +972,7 @@ function renderCheckin() {
           <div class="checkin-hero">
             <div class="portal-skyline" aria-hidden="true"></div>
             <div class="focus-brand">
-              <div class="focus-mark" aria-hidden="true">
-                <span class="focus-mark-piece mark-stem"></span>
-                <span class="focus-mark-piece mark-top"></span>
-                <span class="focus-mark-piece mark-mid"></span>
-              </div>
-              <div class="focus-logo-text">
-                <strong class="focus-word" aria-label="FOCUS">
-                  <span>F</span>
-                  <span>O</span>
-                  <span>C</span>
-                  <span>U</span>
-                  <span>S</span>
-                </strong>
-                <span>BRANCH PORTAL</span>
-              </div>
+              <img class="focus-logo" src="${loginAssetsPath}/focus-logo.svg" alt="FOCUS" />
             </div>
             <p class="hero-greeting">안녕하세요!</p>
             <h2>FOCUS 지점 업무 포털</h2>
@@ -1215,6 +1215,10 @@ document.addEventListener("click", async (event) => {
     if (action === "auth-mode") {
       state.authMode = target.dataset.mode;
       renderCheckin();
+    }
+
+    if (action === "password-help") {
+      showToast("비밀번호 변경은 관리자에게 문의해 주세요.");
     }
 
     if (action === "logout") {

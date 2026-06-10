@@ -1,0 +1,8 @@
+<svg width="240" height="72" viewBox="0 0 240 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="68" height="68" rx="20" fill="url(#g)"/>
+  <path d="M23 50V21h25.5v7.2H31.9v5.4h14.8v7.1H31.9V50H23Z" fill="white"/>
+  <path d="M47.5 50.5c-4.9 0-8.7-1.35-11.35-4.05-2.65-2.7-3.98-6.28-3.98-10.75 0-4.48 1.33-8.05 3.98-10.73 2.65-2.68 6.43-4.02 11.35-4.02 2.98 0 5.62.47 7.92 1.42v7.45c-2.25-1.12-4.62-1.68-7.12-1.68-2.33 0-4.14.66-5.43 1.98-1.28 1.32-1.92 3.18-1.92 5.58 0 2.42.64 4.3 1.92 5.64 1.29 1.34 3.1 2.01 5.43 2.01 2.55 0 4.94-.6 7.18-1.8v7.5c-2.28.97-4.94 1.45-7.98 1.45Z" fill="#CFFCF7" opacity=".55"/>
+  <text x="88" y="34" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" letter-spacing="5" fill="white">FOCUS</text>
+  <text x="90" y="54" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" letter-spacing="2.5" fill="#20E5D0">BRANCH PORTAL</text>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="72" y2="72" gradientUnits="userSpaceOnUse"><stop stop-color="#20E5D0"/><stop offset="1" stop-color="#007D74"/></linearGradient></defs>
+</svg>
