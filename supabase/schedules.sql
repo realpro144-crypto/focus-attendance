@@ -8,13 +8,31 @@ create table if not exists public.schedule_events (
   title text not null,
   memo text not null default '',
   date_key date not null,
+  end_date_key date not null default current_date,
   start_time text,
   end_time text,
-  color text not null default '#007D74',
+  schedule_type text not null default 'personal',
+  color text not null default '#F97316',
   is_official boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.schedule_events
+add column if not exists end_date_key date;
+
+alter table public.schedule_events
+add column if not exists schedule_type text not null default 'personal';
+
+update public.schedule_events
+set end_date_key = coalesce(end_date_key, date_key)
+where end_date_key is null;
+
+alter table public.schedule_events
+alter column end_date_key set not null;
+
+alter table public.schedule_events
+alter column end_date_key set default current_date;
 
 do $$
 begin
@@ -32,6 +50,17 @@ begin
       (is_official = false and employee_id is not null)
     );
   end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'schedule_events_type_check'
+      and conrelid = 'public.schedule_events'::regclass
+  ) then
+    alter table public.schedule_events
+    add constraint schedule_events_type_check
+    check (schedule_type in ('customer', 'education', 'personal', 'vacation'));
+  end if;
 end;
 $$;
 
@@ -40,10 +69,49 @@ alter table public.schedule_events enable row level security;
 create index if not exists schedule_events_date_idx
 on public.schedule_events(date_key);
 
-create index if not exists schedule_events_employee_date_idx
-on public.schedule_events(employee_id, date_key);
+create index if not exists schedule_events_end_date_idx
+on public.schedule_events(end_date_key);
 
-create or replace function public.normalize_schedule_color(color_input text)
+create index if not exists schedule_events_employee_date_idx
+on public.schedule_events(employee_id, date_key, end_date_key);
+
+create or replace function public.normalize_schedule_type(type_input text)
+returns text
+language plpgsql
+immutable
+as $$
+declare
+  clean_type text := lower(trim(coalesce(type_input, '')));
+begin
+  if clean_type in ('customer', 'education', 'personal', 'vacation') then
+    return clean_type;
+  end if;
+
+  return 'personal';
+end;
+$$;
+
+create or replace function public.default_schedule_color(type_input text)
+returns text
+language plpgsql
+immutable
+as $$
+declare
+  clean_type text := public.normalize_schedule_type(type_input);
+begin
+  if clean_type = 'customer' then
+    return '#22C55E';
+  elsif clean_type = 'education' then
+    return '#8B5CF6';
+  elsif clean_type = 'vacation' then
+    return '#6B7280';
+  end if;
+
+  return '#F97316';
+end;
+$$;
+
+create or replace function public.normalize_schedule_color(color_input text, type_input text)
 returns text
 language plpgsql
 immutable
@@ -55,7 +123,7 @@ begin
     return clean_color;
   end if;
 
-  return '#007D74';
+  return public.default_schedule_color(type_input);
 end;
 $$;
 
@@ -117,8 +185,11 @@ begin
     'title', event_row.title,
     'memo', event_row.memo,
     'dateKey', to_char(event_row.date_key, 'YYYY-MM-DD'),
+    'startDateKey', to_char(event_row.date_key, 'YYYY-MM-DD'),
+    'endDateKey', to_char(event_row.end_date_key, 'YYYY-MM-DD'),
     'startTime', event_row.start_time,
     'endTime', event_row.end_time,
+    'type', event_row.schedule_type,
     'color', event_row.color,
     'isOfficial', event_row.is_official,
     'createdAt', event_row.created_at,
@@ -271,14 +342,16 @@ begin
 end;
 $$;
 
+drop function if exists public.upsert_schedule_event(text, uuid, text, text, text, text, text, text, boolean, uuid);
+
 create or replace function public.upsert_schedule_event(
   session_token_input text,
   schedule_id_input uuid,
   title_input text,
-  date_key_input text,
-  start_time_input text,
-  end_time_input text,
+  start_datetime_input text,
+  end_datetime_input text,
   memo_input text,
+  type_input text,
   color_input text,
   is_official_input boolean,
   employee_id_input uuid
@@ -292,60 +365,76 @@ declare
   actor_row public.employees;
   existing_row public.schedule_events;
   event_row public.schedule_events;
+  target_employee public.employees;
   clean_title text := regexp_replace(trim(coalesce(title_input, '')), '\s+', ' ', 'g');
   clean_memo text := left(trim(coalesce(memo_input, '')), 300);
-  clean_date date;
-  clean_start text := nullif(trim(coalesce(start_time_input, '')), '');
-  clean_end text := nullif(trim(coalesce(end_time_input, '')), '');
-  clean_color text := public.normalize_schedule_color(color_input);
+  clean_type text := public.normalize_schedule_type(type_input);
+  clean_color text := public.normalize_schedule_color(color_input, type_input);
+  start_ts timestamp;
+  end_ts timestamp;
   new_is_official boolean := coalesce(is_official_input, false);
   target_employee_id uuid;
 begin
   actor_row := public.require_schedule_actor(session_token_input);
 
   if clean_title = '' then
-    raise exception '일정명을 입력해 주세요.';
+    raise exception '제목을 입력해 주세요.';
   end if;
 
-  if date_key_input !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then
-    raise exception '날짜 형식이 올바르지 않습니다.';
+  begin
+    start_ts := replace(trim(coalesce(start_datetime_input, '')), 'T', ' ')::timestamp;
+  exception when others then
+    raise exception '시작일시가 올바르지 않습니다.';
+  end;
+
+  if nullif(trim(coalesce(end_datetime_input, '')), '') is null then
+    end_ts := start_ts + interval '1 hour';
+  else
+    begin
+      end_ts := replace(trim(end_datetime_input), 'T', ' ')::timestamp;
+    exception when others then
+      raise exception '종료일시가 올바르지 않습니다.';
+    end;
   end if;
 
-  clean_date := date_key_input::date;
-
-  if clean_start is not null and clean_start !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' then
-    raise exception '시작 시간이 올바르지 않습니다.';
+  if end_ts <= start_ts then
+    raise exception '종료일시는 시작일시보다 늦어야 합니다.';
   end if;
 
-  if clean_end is not null and clean_end !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' then
-    raise exception '종료 시간이 올바르지 않습니다.';
-  end if;
+  if new_is_official then
+    if actor_row.is_admin is not true then
+      raise exception '공식 일정은 관리자만 등록할 수 있습니다.';
+    end if;
+    target_employee_id := null;
+  elsif actor_row.is_admin is true then
+    target_employee_id := coalesce(employee_id_input, actor_row.id);
 
-  if clean_start is not null and clean_end is not null and clean_end < clean_start then
-    raise exception '종료 시간은 시작 시간보다 늦어야 합니다.';
+    select * into target_employee
+    from public.employees
+    where id = target_employee_id
+      and active = true;
+
+    if target_employee.id is null then
+      raise exception '대상 지점원을 찾을 수 없습니다.';
+    end if;
+  else
+    target_employee_id := actor_row.id;
+    if employee_id_input is not null and employee_id_input <> actor_row.id then
+      raise exception '개인 일정은 본인 일정만 등록할 수 있습니다.';
+    end if;
   end if;
 
   if schedule_id_input is null then
-    if new_is_official then
-      if actor_row.is_admin is not true then
-        raise exception '공식 일정은 관리자만 등록할 수 있습니다.';
-      end if;
-      target_employee_id := null;
-    else
-      target_employee_id := actor_row.id;
-      if employee_id_input is not null and employee_id_input <> actor_row.id then
-        raise exception '개인 일정은 본인 일정만 등록할 수 있습니다.';
-      end if;
-    end if;
-
     insert into public.schedule_events (
       employee_id,
       created_by,
       title,
       memo,
       date_key,
+      end_date_key,
       start_time,
       end_time,
+      schedule_type,
       color,
       is_official
     )
@@ -354,9 +443,11 @@ begin
       actor_row.id,
       clean_title,
       clean_memo,
-      clean_date,
-      clean_start,
-      clean_end,
+      start_ts::date,
+      end_ts::date,
+      to_char(start_ts, 'HH24:MI'),
+      to_char(end_ts, 'HH24:MI'),
+      clean_type,
       clean_color,
       new_is_official
     )
@@ -373,27 +464,23 @@ begin
     raise exception '일정을 찾을 수 없습니다.';
   end if;
 
-  if existing_row.is_official then
-    if actor_row.is_admin is not true then
-      raise exception '공식 일정은 관리자만 수정할 수 있습니다.';
+  if actor_row.is_admin is not true then
+    if existing_row.is_official or existing_row.employee_id <> actor_row.id then
+      raise exception '본인 일정만 수정할 수 있습니다.';
     end if;
-    target_employee_id := null;
-    new_is_official := true;
-  else
-    if existing_row.employee_id <> actor_row.id then
-      raise exception '개인 일정은 본인 일정만 수정할 수 있습니다.';
-    end if;
-    target_employee_id := actor_row.id;
     new_is_official := false;
+    target_employee_id := actor_row.id;
   end if;
 
   update public.schedule_events
   set employee_id = target_employee_id,
       title = clean_title,
       memo = clean_memo,
-      date_key = clean_date,
-      start_time = clean_start,
-      end_time = clean_end,
+      date_key = start_ts::date,
+      end_date_key = end_ts::date,
+      start_time = to_char(start_ts, 'HH24:MI'),
+      end_time = to_char(end_ts, 'HH24:MI'),
+      schedule_type = clean_type,
       color = clean_color,
       is_official = new_is_official,
       updated_at = now()
@@ -427,12 +514,10 @@ begin
     raise exception '일정을 찾을 수 없습니다.';
   end if;
 
-  if existing_row.is_official then
-    if actor_row.is_admin is not true then
-      raise exception '공식 일정은 관리자만 삭제할 수 있습니다.';
+  if actor_row.is_admin is not true then
+    if existing_row.is_official or existing_row.employee_id <> actor_row.id then
+      raise exception '본인 일정만 삭제할 수 있습니다.';
     end if;
-  elsif existing_row.employee_id <> actor_row.id then
-    raise exception '개인 일정은 본인 일정만 삭제할 수 있습니다.';
   end if;
 
   delete from public.schedule_events

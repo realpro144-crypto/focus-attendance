@@ -453,6 +453,24 @@ button:disabled {
   gap: 6px;
 }
 
+.calendar-search-btn {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.calendar-search-btn img {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .calendar-filter {
   gap: 5px;
 }
@@ -518,10 +536,11 @@ button:disabled {
 .day-number {
   display: flex;
   min-width: 0;
-  min-height: 28px;
+  min-height: 20px;
   align-items: flex-start;
   justify-content: space-between;
   gap: 4px;
+  padding-right: 24px;
   font-size: 14px;
   font-weight: 900;
 }
@@ -561,9 +580,11 @@ button:disabled {
 
 .attendance-stamp {
   display: block;
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
   object-fit: contain;
   pointer-events: none;
 }
@@ -571,42 +592,51 @@ button:disabled {
 .schedule-list {
   display: grid;
   align-content: start;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
-  padding-top: 6px;
+  min-height: 40px;
+  padding-top: 3px;
 }
 
 .schedule-pill {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: block;
   align-items: center;
-  gap: 5px;
-  min-height: 23px;
-  padding: 3px 5px 3px 7px;
-  border-radius: 5px;
-  background: #f5f7fa;
-  color: #172033;
-  box-shadow: inset 3px 0 0 var(--schedule-color);
-  font-size: 11px;
+  height: 18px;
+  padding: 2px 7px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--schedule-color);
+  color: #ffffff;
+  font-size: 10.5px;
   font-weight: 800;
-  line-height: 1.25;
-}
-
-.schedule-pill.official {
-  background: #eefbf8;
+  line-height: 14px;
 }
 
 .schedule-pill-title {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.schedule-pill time {
-  color: #6b7280;
-  font-size: 10px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
+.schedule-pill.start {
+  margin-right: -5px;
+  border-radius: 9px 0 0 9px;
+}
+
+.schedule-pill.middle {
+  margin-right: -5px;
+  margin-left: -5px;
+  border-radius: 0;
+}
+
+.schedule-pill.end {
+  margin-left: -5px;
+  border-radius: 0 9px 9px 0;
+}
+
+.schedule-pill.single {
+  border-radius: 9px;
 }
 
 .more {
@@ -628,7 +658,8 @@ button:disabled {
   bottom: 0;
   z-index: 40;
   width: min(560px, 100%);
-  max-height: min(82vh, 760px);
+  height: 60vh;
+  max-height: 60vh;
   padding: 10px 16px 18px;
   overflow-y: auto;
   border-radius: 24px 24px 0 0;
@@ -683,7 +714,7 @@ button:disabled {
 .sheet-section {
   display: grid;
   gap: 10px;
-  padding: 14px 0;
+  padding: 12px 0;
   border-bottom: 1px solid #eef1f5;
 }
 
@@ -718,36 +749,38 @@ button:disabled {
 }
 
 .mini-btn.primary {
-  background: var(--accent);
+  background: #10b981;
   color: #fff;
 }
 
-.attendance-summary-list,
+.attendance-compact-list,
 .schedule-detail-list {
   display: grid;
   gap: 8px;
 }
 
-.attendance-summary-row {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+.attendance-compact-list {
+  padding: 16px 0 10px;
+}
+
+.attendance-compact-row {
+  display: inline-grid;
+  grid-template-columns: 18px auto auto;
   align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: #f8fafc;
-  color: var(--text);
+  gap: 7px;
+  width: max-content;
+  color: #1f2937;
+  font-size: 14px;
   font-weight: 800;
 }
 
-.attendance-summary-row img {
-  width: 22px;
-  height: 22px;
+.attendance-compact-row img {
+  width: 18px;
+  height: 18px;
 }
 
-.attendance-summary-row time {
-  color: var(--accent);
+.attendance-compact-row time {
+  color: #1f2937;
   font-variant-numeric: tabular-nums;
 }
 
@@ -766,10 +799,12 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 8px;
-  border: 1px solid #e3e8ef;
+  min-height: 56px;
+  padding: 8px 16px;
+  border: 0;
   border-radius: 12px;
   background: #fff;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
 }
 
 .schedule-detail-row.selected {
@@ -804,14 +839,14 @@ button:disabled {
 }
 
 .schedule-row-main strong {
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.35;
 }
 
 .schedule-row-main small {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -866,16 +901,38 @@ button:disabled {
   display: grid;
   gap: 12px;
   margin-top: 14px;
-  padding: 14px;
+  padding: 0;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  background: #fbfcfd;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .schedule-time-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.schedule-time-grid.stacked {
+  grid-template-columns: 1fr;
+}
+
+.schedule-title-input,
+.schedule-type-select,
+.schedule-datetime-input {
+  min-height: 48px;
+  border-radius: 12px;
+}
+
+.schedule-datetime-input::-webkit-calendar-picker-indicator {
+  opacity: 0.72;
+}
+
+.field-hint {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .textarea {
@@ -1447,10 +1504,10 @@ button:disabled {
 }
 
 .calendar-page-shell {
-  width: min(680px, 100%);
+  width: min(480px, 100%);
   min-height: 100vh;
   margin: 0 auto;
-  padding: 8px 8px 104px;
+  padding: 0 0 104px;
 }
 
 .employee-calendar-view {
@@ -1462,21 +1519,23 @@ button:disabled {
   top: 0;
   z-index: 12;
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px 44px;
   align-items: center;
-  gap: 8px;
-  padding: 10px 4px 12px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(10px);
+  gap: 4px;
+  height: 72px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
 }
 
 .calendar-month-title {
-  min-height: 46px;
-  border-radius: 999px;
-  background: #fff;
-  color: #111827;
-  font-size: 28px;
-  font-weight: 900;
+  min-width: 0;
+  min-height: 44px;
+  border-radius: 0;
+  background: transparent;
+  color: #1f2937;
+  font-size: 36px;
+  font-weight: 700;
   letter-spacing: 0;
   line-height: 1;
   text-align: center;
@@ -1487,12 +1546,12 @@ button:disabled {
   width: 44px;
   height: 44px;
   place-items: center;
-  border-radius: 50%;
-  background: #fff;
+  border-radius: 14px;
+  background: #ffffff;
   color: var(--text);
-  font-size: 28px;
-  font-weight: 800;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+  font-size: 26px;
+  font-weight: 700;
+  box-shadow: none;
 }
 
 .calendar-page .calendar-wrap {
@@ -1508,8 +1567,8 @@ button:disabled {
 .calendar-page .weekday {
   border-bottom: 0;
   color: var(--text);
-  font-size: 14px;
-  padding: 10px 0 8px;
+  font-size: 12px;
+  padding: 8px 0;
 }
 
 .calendar-page .weekday.holiday {
@@ -1521,10 +1580,12 @@ button:disabled {
 }
 
 .calendar-page .day {
-  min-height: 104px;
+  width: auto;
+  min-height: 72px;
+  height: 72px;
   border-right: 0;
   border-bottom: 1px solid #edf0f3;
-  padding: 7px 4px;
+  padding: 4px;
 }
 
 .calendar-page .day.outside {
@@ -1534,44 +1595,216 @@ button:disabled {
 
 .calendar-page .day-number {
   justify-content: space-between;
-  font-size: 16px;
+  min-height: 20px;
+  font-size: 13px;
 }
 
 .calendar-page .date-number {
-  min-width: 27px;
-  height: 27px;
+  min-width: 20px;
+  height: 20px;
 }
 
 .calendar-page .attendance-stamp {
-  width: 17px;
-  height: 17px;
+  width: 22px;
+  height: 22px;
 }
 
 .calendar-page .schedule-list {
-  padding-top: 8px;
+  padding-top: 4px;
 }
 
 .calendar-page .schedule-pill {
-  min-height: 21px;
-  padding-right: 4px;
-  font-size: 10.5px;
+  height: 18px;
+  min-height: 18px;
+  font-size: 10px;
 }
 
-.floating-home-btn {
+.calendar-home-btn {
   position: fixed;
-  right: 18px;
-  bottom: 22px;
+  left: 24px;
+  bottom: 24px;
   z-index: 20;
   display: grid;
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   place-items: center;
   border-radius: 50%;
-  background: #3f3f46;
+  background: #0f172a;
   color: #fff;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
-  font-size: 18px;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.22);
+  font-size: 15px;
   font-weight: 900;
+}
+
+.calendar-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 21;
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: 50%;
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 16px 32px rgba(16, 185, 129, 0.34);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.calendar-search-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgba(15, 23, 42, 0.18);
+}
+
+.calendar-search-panel {
+  position: fixed;
+  left: 50%;
+  top: 0;
+  z-index: 45;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  width: min(480px, 100%);
+  max-height: 100vh;
+  padding: 0 12px 20px;
+  overflow-y: auto;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+  transform: translateX(-50%);
+}
+
+.calendar-search-header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  min-height: 56px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.calendar-search-header h2 {
+  grid-column: 2;
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.calendar-search-close {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 12px;
+  background: transparent;
+  color: #111827;
+  font-size: 30px;
+}
+
+.calendar-search-input-wrap {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #dce3ea;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.calendar-search-input-wrap img {
+  width: 20px;
+  height: 20px;
+}
+
+.calendar-search-input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: #1f2937;
+  font-size: 15px;
+}
+
+.calendar-search-results {
+  display: grid;
+  gap: 8px;
+}
+
+.calendar-search-results h3 {
+  margin: 8px 0 2px;
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.calendar-search-result {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid #e5eaf0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #1f2937;
+  text-align: left;
+}
+
+.search-result-date {
+  display: grid;
+  height: 48px;
+  place-items: center;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #111827;
+  line-height: 1;
+}
+
+.search-result-date b {
+  font-size: 15px;
+}
+
+.search-result-date small {
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.search-result-main {
+  min-width: 0;
+}
+
+.search-result-main strong,
+.search-result-main small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-main strong {
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.search-result-main small {
+  margin-top: 3px;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.search-result-arrow {
+  color: #9ca3af;
+  font-size: 24px;
+  text-align: right;
 }
 
 .scan-tip {
@@ -1722,22 +1955,23 @@ button:disabled {
 
 @media (max-width: 430px) {
   .calendar-page-shell {
-    padding: 6px 6px 96px;
+    padding: 0 0 96px;
   }
 
   .employee-calendar-header {
-    grid-template-columns: 42px minmax(0, 1fr) 42px;
-    padding-bottom: 10px;
+    grid-template-columns: 44px minmax(0, 1fr) 44px 44px;
+    height: 72px;
+    padding: 0 16px;
   }
 
   .calendar-nav-btn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
 
   .calendar-month-title {
-    min-height: 42px;
-    font-size: 25px;
+    min-height: 44px;
+    font-size: 34px;
   }
 
   .calendar-page .weekday {
@@ -1745,34 +1979,31 @@ button:disabled {
   }
 
   .calendar-page .day {
-    min-height: 92px;
-    padding: 6px 3px;
+    min-height: 72px;
+    height: 72px;
+    padding: 4px;
   }
 
   .calendar-page .date-number {
-    min-width: 25px;
-    height: 25px;
-    font-size: 15px;
+    min-width: 20px;
+    height: 20px;
+    font-size: 13px;
   }
 
   .calendar-page .attendance-stamp {
-    width: 15px;
-    height: 15px;
+    width: 22px;
+    height: 22px;
   }
 
   .calendar-page .schedule-pill {
     display: block;
-    min-height: 20px;
-    padding: 3px 4px 3px 6px;
+    min-height: 18px;
+    height: 18px;
+    padding: 2px 6px;
     font-size: 10px;
   }
 
-  .calendar-page .schedule-pill time {
-    display: none;
-  }
-
   .day-sheet {
-    max-height: 84vh;
     padding-right: 14px;
     padding-left: 14px;
   }
