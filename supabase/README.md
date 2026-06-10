@@ -6,10 +6,13 @@ Supabase 프로젝트를 새로 만들었거나 데이터베이스 구조를 다
 
 1. SQL Editor에서 `schema.sql` 전체 실행
 2. SQL Editor에서 `admin-functions.sql` 전체 실행
+3. SQL Editor에서 `schedules.sql` 전체 실행
 
 ## 이미 운영 중인 프로젝트
 
 관리자 기능, 계정 관리, 출근 기록 함수만 수정했다면 보통 `admin-functions.sql`만 다시 실행하면 됩니다.
+
+일정 추가/수정/삭제, 공식 일정, 캘린더 권한을 수정했다면 `schedules.sql`을 다시 실행합니다.
 
 ## 현재 관리자 계정
 

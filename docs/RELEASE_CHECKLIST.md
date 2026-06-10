@@ -26,8 +26,10 @@ SQL 파일을 수정한 경우에는 Supabase SQL Editor에서 해당 파일을 
 
 1. `supabase/schema.sql`
 2. `supabase/admin-functions.sql`
+3. `supabase/schedules.sql`
 
 이미 운영 중인 프로젝트에서 관리자 기능만 바꾼 경우에는 `supabase/admin-functions.sql`만 다시 실행하면 됩니다.
+일정 기능이나 캘린더 권한을 바꾼 경우에는 `supabase/schedules.sql`도 다시 실행합니다.
 
 ## GitHub/Vercel 배포
 

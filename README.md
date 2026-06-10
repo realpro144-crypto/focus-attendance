@@ -32,6 +32,7 @@ npm run check
 2. Supabase 프로젝트의 SQL Editor를 엽니다.
 3. `supabase/schema.sql` 파일 내용을 전체 복사해서 실행합니다.
 4. 이어서 `supabase/admin-functions.sql` 파일 내용도 전체 복사해서 실행합니다.
+5. 일정 기능을 사용하려면 `supabase/schedules.sql` 파일 내용도 전체 복사해서 실행합니다.
 5. Project Settings > API에서 아래 값을 확인합니다.
    - Project URL
    - anon public key

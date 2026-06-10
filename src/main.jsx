@@ -13,4 +13,7 @@ function App() {
   return <div ref={appRef} className="app-shell" aria-live="polite" />;
 }
 
-createRoot(document.querySelector("#root")).render(<App />);
+const rootElement = document.querySelector("#root");
+const root = globalThis.__focusAppRoot || createRoot(rootElement);
+globalThis.__focusAppRoot = root;
+root.render(<App />);

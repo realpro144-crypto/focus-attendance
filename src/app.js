@@ -4,7 +4,9 @@ import QRCode from "qrcode";
 const AUTH_STORAGE_KEY = "focusAttendanceSession";
 const SAVED_LOGIN_STORAGE_KEY = "focusAttendanceSavedLogin";
 const colors = ["#0f766e", "#2563eb", "#9333ea", "#d97706", "#db2777", "#16a34a", "#475569", "#dc2626"];
+const scheduleColors = ["#007D74", "#2563EB", "#E11D48", "#F59E0B", "#7C3AED", "#16A34A", "#0F172A", "#EC4899"];
 const loginAssetsPath = "/assets/login";
+const calendarAssetsPath = "/assets/calendar";
 
 let app = null;
 let supabase = null;
@@ -18,15 +20,18 @@ let state = {
   settings: { branchName: "FOCUS 지점", timezone: "Asia/Seoul" },
   employees: [],
   records: [],
+  schedules: [],
   today: null,
   checkInUrl: "",
   wallQrUrl: "",
   attendanceCode: "",
   qrDataUrl: "",
   selectedDate: toDateKey(new Date()),
-  timeBubbleDate: "",
   monthCursor: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   employeeFilter: "all",
+  daySheetOpen: false,
+  scheduleEditorMode: "",
+  selectedScheduleId: "",
   authMode: "login",
   auth: { status: "checking", token: "", employee: null },
   savedLogin: { employeeNo: "", password: "", rememberCredentials: false, autoLogin: false },
@@ -217,6 +222,10 @@ function activeEmployees() {
   return state.employees.filter((employee) => employee.active !== false);
 }
 
+function employeeById(employeeId) {
+  return activeEmployees().find((employee) => employee.id === employeeId);
+}
+
 function isAdminEmployee(employee = state.auth.employee) {
   return Boolean(employee?.isAdmin);
 }
@@ -244,6 +253,59 @@ function monthRecords() {
   const year = state.monthCursor.getFullYear();
   const month = String(state.monthCursor.getMonth() + 1).padStart(2, "0");
   return filteredRecords().filter((record) => record.dateKey.startsWith(`${year}-${month}`));
+}
+
+function compareSchedules(a, b) {
+  return (
+    (a.startTime || "99:99").localeCompare(b.startTime || "99:99") ||
+    String(a.title || "").localeCompare(String(b.title || ""), "ko-KR")
+  );
+}
+
+function normalizedScheduleColor(value) {
+  const color = String(value || "").trim();
+  return /^#[0-9A-Fa-f]{6}$/.test(color) ? color : scheduleColors[0];
+}
+
+function filteredSchedules() {
+  const schedules = state.schedules || [];
+  if (!isAdminRoute() || state.employeeFilter === "all") return schedules;
+  return schedules.filter((schedule) => schedule.isOfficial || schedule.employeeId === state.employeeFilter);
+}
+
+function schedulesForDate(dateKey) {
+  return filteredSchedules()
+    .filter((schedule) => schedule.dateKey === dateKey)
+    .sort(compareSchedules);
+}
+
+function schedulesByDate() {
+  return filteredSchedules().reduce((acc, schedule) => {
+    acc[schedule.dateKey] ||= [];
+    acc[schedule.dateKey].push(schedule);
+    return acc;
+  }, {});
+}
+
+function scheduleById(scheduleId) {
+  return (state.schedules || []).find((schedule) => schedule.id === scheduleId);
+}
+
+function scheduleTimeLabel(schedule) {
+  if (schedule.startTime && schedule.endTime) return `${schedule.startTime} - ${schedule.endTime}`;
+  if (schedule.startTime) return schedule.startTime;
+  return "시간 미정";
+}
+
+function scheduleOwnerLabel(schedule) {
+  if (schedule.isOfficial) return "공식 일정";
+  return schedule.employeeName || employeeById(schedule.employeeId)?.name || "개인 일정";
+}
+
+function canManageSchedule(schedule) {
+  if (!state.auth.employee || !schedule) return false;
+  if (isAdminEmployee() && isAdminRoute()) return schedule.isOfficial;
+  return !schedule.isOfficial && schedule.employeeId === state.auth.employee.id;
 }
 
 function showToast(message) {
@@ -349,6 +411,9 @@ async function loadState({ keepCheckIn = false } = {}) {
   state = {
     ...state,
     ...payload,
+    employees: payload.employees ?? [],
+    records: payload.records ?? [],
+    schedules: payload.schedules ?? [],
     checkInUrl,
     wallQrUrl,
     attendanceCode,
@@ -405,6 +470,10 @@ function clearSession() {
   state.pendingQrCode = "";
   state.scannerStatus = "idle";
   state.scannerError = "";
+  state.schedules = [];
+  state.daySheetOpen = false;
+  state.scheduleEditorMode = "";
+  state.selectedScheduleId = "";
 }
 
 function renderTopbar() {
@@ -543,12 +612,13 @@ function renderCalendarToolbar() {
     year: "numeric",
     month: "long"
   }).format(state.monthCursor);
+  const compactMonthTitle = monthTitle.replace("년 ", ". ").replace("월", ".");
 
   if (employeeView) {
     return `
       <div class="employee-calendar-header">
         <button class="calendar-nav-btn" title="이전 달" data-action="prev-month">‹</button>
-        <h1>${escapeHtml(monthTitle.replace("년 ", ". ").replace("월", "."))}</h1>
+        <button class="calendar-month-title" data-action="today" title="오늘로 이동">${escapeHtml(compactMonthTitle)}</button>
         <button class="calendar-nav-btn" title="다음 달" data-action="next-month">›</button>
       </div>
     `;
@@ -561,25 +631,19 @@ function renderCalendarToolbar() {
         <button class="icon-btn" title="다음 달" data-action="next-month">›</button>
         <button class="btn secondary" data-action="today">오늘</button>
       </div>
-      <h2 class="month-title">${employeeView ? "내 출근 캘린더" : escapeHtml(monthTitle)}</h2>
-      ${
-        employeeView
-          ? `<span class="meta-line">${escapeHtml(monthTitle)}</span>`
-          : `
-            <label class="field">
-              <span>지점원 필터</span>
-              <select class="select" data-action="employee-filter">
-                <option value="all"${state.employeeFilter === "all" ? " selected" : ""}>전체 지점원</option>
-                ${activeEmployees()
-                  .map(
-                    (employee) =>
-                      `<option value="${employee.id}"${state.employeeFilter === employee.id ? " selected" : ""}>${escapeHtml(employee.name)} (${escapeHtml(employeeNoLabel(employee.employeeNo))})</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
-          `
-      }
+      <h2 class="month-title">${escapeHtml(monthTitle)}</h2>
+      <label class="field calendar-filter">
+        <span>지점원 캘린더</span>
+        <select class="select" data-action="employee-filter">
+          <option value="all"${state.employeeFilter === "all" ? " selected" : ""}>전체 지점원</option>
+          ${activeEmployees()
+            .map(
+              (employee) =>
+                `<option value="${employee.id}"${state.employeeFilter === employee.id ? " selected" : ""}>${escapeHtml(employee.name)} (${escapeHtml(employeeNoLabel(employee.employeeNo))})</option>`
+            )
+            .join("")}
+        </select>
+      </label>
     </div>
   `;
 }
@@ -593,6 +657,7 @@ function renderCalendar() {
   const start = new Date(year, month, 1 - first.getDay());
   const todayKey = state.today?.dateKey || toDateKey(new Date());
   const grouped = recordsByDate();
+  const scheduleGrouped = schedulesByDate();
   const days = Array.from({ length: 42 }, (_, index) => {
     const day = new Date(start);
     day.setDate(start.getDate() + index);
@@ -600,7 +665,7 @@ function renderCalendar() {
   });
 
   return `
-    <section class="${employeeView ? "employee-calendar-view" : "panel"}">
+    <section class="${employeeView ? "employee-calendar-view" : "panel calendar-panel"}">
       ${renderCalendarToolbar()}
       <div class="calendar-wrap">
         <div class="calendar">
@@ -611,16 +676,16 @@ function renderCalendar() {
             .map((day) => {
               const key = toDateKey(day);
               const records = (grouped[key] || []).sort((a, b) => a.localTime.localeCompare(b.localTime));
-              const visible = records.slice(0, 3);
+              const schedules = (scheduleGrouped[key] || []).sort(compareSchedules);
+              const visibleSchedules = schedules.slice(0, employeeView ? 3 : 4);
               const tone = calendarDayTone(day, key);
-              const showEmployeeBubble = employeeView && records.length > 0 && state.timeBubbleDate === key;
               const classes = [
                 "day",
                 day.getMonth() !== month ? "outside" : "",
                 key === todayKey ? "today" : "",
-                !employeeView && key === state.selectedDate ? "selected" : "",
+                key === state.selectedDate ? "selected" : "",
                 tone,
-                employeeView && records.length ? "checked-in" : ""
+                records.length ? "checked-in" : ""
               ]
                 .filter(Boolean)
                 .join(" ");
@@ -632,33 +697,22 @@ function renderCalendar() {
                 <button class="${classes}" data-action="select-date" data-date="${key}">
                   <div class="day-number">
                     <span class="${dateNumberClasses}">${day.getDate()}</span>
-                    ${records.length && !employeeView ? `<span class="count-pill">${records.length}</span>` : ""}
+                    ${records.length ? `<img class="attendance-stamp" src="${calendarAssetsPath}/stamp-attendance.svg" alt="출근" />` : ""}
                   </div>
-                  <div class="record-list">
+                  <div class="schedule-list">
                     ${
-                      employeeView
-                        ? records
-                            .slice(0, 1)
-                            .map(
-                              (record) => `
-                                <div class="attendance-sticker">출근</div>
-                                ${showEmployeeBubble ? `<div class="attendance-bubble">출근 ${escapeHtml(record.localTime)}</div>` : ""}
-                              `
-                            )
-                            .join("")
-                        : visible
-                            .map(
-                              (record) => `
-                                <div class="record-pill">
-                                  <span class="dot" style="background:${employeeColor(record.employeeId)}"></span>
-                                  <span>${escapeHtml(record.employeeName)}</span>
-                                  <time>${escapeHtml(record.localTime)}</time>
-                                </div>
-                              `
-                            )
-                            .join("")
+                      visibleSchedules
+                        .map(
+                          (schedule) => `
+                            <div class="schedule-pill ${schedule.isOfficial ? "official" : ""}" style="--schedule-color:${normalizedScheduleColor(schedule.color)}">
+                              <span class="schedule-pill-title">${escapeHtml(schedule.title)}</span>
+                              ${schedule.startTime ? `<time>${escapeHtml(schedule.startTime)}</time>` : ""}
+                            </div>
+                          `
+                        )
+                        .join("")
                     }
-                    ${!employeeView && records.length > visible.length ? `<div class="more">+${records.length - visible.length}명 더</div>` : ""}
+                    ${schedules.length > visibleSchedules.length ? `<div class="more">+${schedules.length - visibleSchedules.length}개 더</div>` : ""}
                   </div>
                 </button>
               `;
@@ -670,37 +724,167 @@ function renderCalendar() {
   `;
 }
 
-function renderDetails() {
-  const records = recordsForDate(state.selectedDate);
-  const employeeView = isEmployeeRoute();
+function renderScheduleForm() {
+  const editing = state.scheduleEditorMode === "edit";
+  const schedule = editing ? scheduleById(state.selectedScheduleId) : null;
+  if (editing && !canManageSchedule(schedule)) return "";
+
+  const isAdmin = isAdminEmployee() && isAdminRoute();
+  const selectedColor = normalizedScheduleColor(schedule?.color);
+
   return `
-    <section class="panel">
-      <div class="panel-header">
-        <h3>${escapeHtml(formatKoreanDate(state.selectedDate))}</h3>
-        <span class="meta-line">${employeeView ? (records.length ? "출근 완료" : "기록 없음") : `${records.length}명 출근`}</span>
+    <form class="schedule-form" data-form="schedule" data-schedule-id="${escapeHtml(schedule?.id || "")}">
+      <label class="field">
+        <span>일정명</span>
+        <input class="input" name="title" maxlength="40" placeholder="예: 지점 교육, 고객 미팅" value="${escapeHtml(schedule?.title || "")}" required />
+      </label>
+      <div class="schedule-time-grid">
+        <label class="field">
+          <span>시작</span>
+          <input class="input" name="startTime" type="time" value="${escapeHtml(schedule?.startTime || "")}" />
+        </label>
+        <label class="field">
+          <span>종료</span>
+          <input class="input" name="endTime" type="time" value="${escapeHtml(schedule?.endTime || "")}" />
+        </label>
       </div>
-      <div class="panel-body">
-        <div class="details-list">
+      ${
+        isAdmin
+          ? `
+            <div class="official-schedule-note">관리자 페이지에서 추가하는 일정은 모든 지점원에게 보이는 공식 일정입니다.</div>
+            <input type="hidden" name="isOfficial" value="true" />
+            <input type="hidden" name="employeeId" value="" />
+          `
+          : `
+            <input type="hidden" name="isOfficial" value="false" />
+            <input type="hidden" name="employeeId" value="${escapeHtml(state.auth.employee?.id || "")}" />
+          `
+      }
+      <fieldset class="color-picker">
+        <legend>일정 색상</legend>
+        <div>
+          ${scheduleColors
+            .map(
+              (color) => `
+                <label class="color-choice" title="${color}">
+                  <input type="radio" name="color" value="${color}"${selectedColor.toUpperCase() === color.toUpperCase() ? " checked" : ""} />
+                  <span style="background:${color}"></span>
+                </label>
+              `
+            )
+            .join("")}
+        </div>
+      </fieldset>
+      <label class="field">
+        <span>메모</span>
+        <textarea class="input textarea" name="memo" maxlength="300" placeholder="필요한 내용을 간단히 적어주세요.">${escapeHtml(schedule?.memo || "")}</textarea>
+      </label>
+      <div class="sheet-actions">
+        <button class="btn secondary" type="button" data-action="cancel-schedule-edit">취소</button>
+        <button class="btn primary" type="submit">${editing ? "수정 저장" : "일정 추가"}</button>
+      </div>
+    </form>
+  `;
+}
+
+function renderDaySheet() {
+  if (!state.daySheetOpen || !state.selectedDate || !state.auth.employee) return "";
+
+  const records = recordsForDate(state.selectedDate);
+  const schedules = schedulesForDate(state.selectedDate);
+  const selectedSchedule = scheduleById(state.selectedScheduleId);
+  const showEditor = state.scheduleEditorMode === "create" || state.scheduleEditorMode === "edit";
+
+  return `
+    <div class="sheet-backdrop" data-action="close-day-sheet"></div>
+    <section class="day-sheet" role="dialog" aria-modal="true" aria-label="날짜 상세">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <header class="sheet-header">
+        <div>
+          <span>선택한 날짜</span>
+          <h2>${escapeHtml(formatFullDate(state.selectedDate))}</h2>
+        </div>
+        <button class="sheet-close" type="button" data-action="close-day-sheet" title="닫기">×</button>
+      </header>
+
+      <div class="sheet-section">
+        <div class="sheet-section-title">
+          <h3>출근 확인</h3>
+          <span>${records.length ? `${records.length}건` : "기록 없음"}</span>
+        </div>
+        <div class="attendance-summary-list">
           ${
             records.length
               ? records
                   .map(
                     (record) => `
-                      <div class="detail-row">
-                        <span class="dot" style="background:${employeeColor(record.employeeId)}"></span>
-                        <span>
-                          <span class="employee-name">${employeeView ? "내 출근" : escapeHtml(record.employeeName)}</span>
-                          <span class="employee-meta">${employeeView ? escapeHtml(record.dateKey) : escapeHtml(employeeNoLabel(record.employeeNo))}</span>
-                        </span>
-                        <time class="time-text">${escapeHtml(record.localTime)}</time>
+                      <div class="attendance-summary-row">
+                        <img src="${calendarAssetsPath}/stamp-attendance.svg" alt="" aria-hidden="true" />
+                        <span>${isEmployeeRoute() ? "내 출근" : escapeHtml(record.employeeName)}</span>
+                        <time>${escapeHtml(record.localTime)}</time>
                       </div>
                     `
                   )
                   .join("")
-              : `<div class="empty">${employeeView ? "선택한 날짜에는 출근 기록이 없습니다." : "선택한 날짜에는 아직 출근 기록이 없습니다."}</div>`
+              : `<div class="sheet-empty">선택한 날짜의 출근 기록이 없습니다.</div>`
           }
         </div>
       </div>
+
+      <div class="sheet-section">
+        <div class="sheet-section-title">
+          <h3>일정</h3>
+          <button class="mini-btn primary" type="button" data-action="add-schedule">일정 추가</button>
+        </div>
+        <div class="schedule-detail-list">
+          ${
+            schedules.length
+              ? schedules
+                  .map((schedule) => {
+                    const color = normalizedScheduleColor(schedule.color);
+                    const selected = schedule.id === state.selectedScheduleId;
+                    return `
+                      <div class="schedule-detail-row ${selected ? "selected" : ""}">
+                        <button class="schedule-row-main" type="button" data-action="select-schedule" data-schedule-id="${escapeHtml(schedule.id)}">
+                          <span class="schedule-color-dot" style="background:${color}"></span>
+                          <span>
+                            <strong>${escapeHtml(schedule.title)}</strong>
+                            <small>${escapeHtml(scheduleOwnerLabel(schedule))} · ${escapeHtml(scheduleTimeLabel(schedule))}</small>
+                          </span>
+                        </button>
+                        ${
+                          canManageSchedule(schedule)
+                            ? `
+                              <div class="schedule-row-actions">
+                                <button type="button" data-action="edit-schedule" data-schedule-id="${escapeHtml(schedule.id)}">수정</button>
+                                <button type="button" data-action="delete-schedule" data-schedule-id="${escapeHtml(schedule.id)}">삭제</button>
+                              </div>
+                            `
+                            : ""
+                        }
+                      </div>
+                    `;
+                  })
+                  .join("")
+              : `<div class="sheet-empty">등록된 일정이 없습니다.</div>`
+          }
+        </div>
+      </div>
+
+      ${
+        selectedSchedule && !showEditor
+          ? `
+            <article class="schedule-preview-card" style="--schedule-color:${normalizedScheduleColor(selectedSchedule.color)}">
+              <span>${escapeHtml(scheduleOwnerLabel(selectedSchedule))}</span>
+              <h3>${escapeHtml(selectedSchedule.title)}</h3>
+              <p>${escapeHtml(scheduleTimeLabel(selectedSchedule))}</p>
+              <p>${selectedSchedule.memo ? escapeHtml(selectedSchedule.memo) : "메모가 없습니다."}</p>
+            </article>
+          `
+          : ""
+      }
+
+      ${showEditor ? renderScheduleForm() : ""}
     </section>
   `;
 }
@@ -744,9 +928,9 @@ function renderDashboard() {
       <section class="main-stack">
         ${renderStats()}
         ${renderCalendar()}
-        ${renderDetails()}
       </section>
     </main>
+    ${renderDaySheet()}
   `;
 }
 
@@ -993,6 +1177,7 @@ function renderEmployeeCalendarPage() {
         ${state.auth.employee ? renderCalendar() : renderAuthPanel()}
       </main>
       <button class="floating-home-btn" data-action="go-home" title="홈">홈</button>
+      ${state.auth.employee ? renderDaySheet() : ""}
     </div>
   `;
 }
@@ -1195,7 +1380,9 @@ document.addEventListener("click", async (event) => {
     if (action === "prev-month" || action === "next-month") {
       const direction = action === "prev-month" ? -1 : 1;
       state.monthCursor = new Date(state.monthCursor.getFullYear(), state.monthCursor.getMonth() + direction, 1);
-      state.timeBubbleDate = "";
+      state.daySheetOpen = false;
+      state.scheduleEditorMode = "";
+      state.selectedScheduleId = "";
       render();
     }
 
@@ -1203,13 +1390,66 @@ document.addEventListener("click", async (event) => {
       const today = new Date();
       state.monthCursor = new Date(today.getFullYear(), today.getMonth(), 1);
       state.selectedDate = state.today?.dateKey || toDateKey(today);
+      state.daySheetOpen = true;
+      state.scheduleEditorMode = "";
+      state.selectedScheduleId = "";
       render();
     }
 
     if (action === "select-date") {
       state.selectedDate = target.dataset.date;
-      if (isEmployeeRoute()) state.timeBubbleDate = state.timeBubbleDate === target.dataset.date ? "" : target.dataset.date;
+      state.daySheetOpen = true;
+      state.scheduleEditorMode = "";
+      state.selectedScheduleId = "";
       render();
+    }
+
+    if (action === "close-day-sheet") {
+      state.daySheetOpen = false;
+      state.scheduleEditorMode = "";
+      state.selectedScheduleId = "";
+      render();
+    }
+
+    if (action === "add-schedule") {
+      state.scheduleEditorMode = "create";
+      state.selectedScheduleId = "";
+      state.daySheetOpen = true;
+      render();
+    }
+
+    if (action === "select-schedule") {
+      state.selectedScheduleId = target.dataset.scheduleId;
+      state.scheduleEditorMode = "";
+      state.daySheetOpen = true;
+      render();
+    }
+
+    if (action === "edit-schedule") {
+      state.selectedScheduleId = target.dataset.scheduleId;
+      state.scheduleEditorMode = "edit";
+      state.daySheetOpen = true;
+      render();
+    }
+
+    if (action === "cancel-schedule-edit") {
+      state.scheduleEditorMode = "";
+      render();
+    }
+
+    if (action === "delete-schedule") {
+      const schedule = scheduleById(target.dataset.scheduleId);
+      if (!schedule || !canManageSchedule(schedule)) return;
+      if (!window.confirm(`'${schedule.title}' 일정을 삭제할까요?`)) return;
+      await callRpc("delete_schedule_event", {
+        session_token_input: state.auth.token,
+        schedule_id_input: schedule.id
+      });
+      state.selectedScheduleId = "";
+      state.scheduleEditorMode = "";
+      state.daySheetOpen = true;
+      await refresh({ keepCheckIn: route() === "checkin" });
+      showToast("일정을 삭제했습니다.");
     }
 
     if (action === "auth-mode") {
@@ -1230,6 +1470,7 @@ document.addEventListener("click", async (event) => {
 
     if (action === "open-calendar") {
       window.history.pushState({}, "", "/calendar");
+      await loadState({ keepCheckIn: true });
       renderEmployeeCalendarPage();
     }
 
@@ -1275,6 +1516,9 @@ document.addEventListener("change", async (event) => {
 
   if (event.target.dataset.action === "employee-filter") {
     state.employeeFilter = event.target.value;
+    state.daySheetOpen = false;
+    state.scheduleEditorMode = "";
+    state.selectedScheduleId = "";
     renderDashboard();
   }
 
@@ -1319,6 +1563,26 @@ document.addEventListener("submit", async (event) => {
       });
       form.reset();
       showToast("비밀번호를 변경했습니다.");
+    }
+
+    if (form.dataset.form === "schedule") {
+      await callRpc("upsert_schedule_event", {
+        session_token_input: state.auth.token,
+        schedule_id_input: form.dataset.scheduleId || null,
+        title_input: data.title,
+        date_key_input: state.selectedDate || state.today?.dateKey || toDateKey(new Date()),
+        start_time_input: data.startTime || "",
+        end_time_input: data.endTime || "",
+        memo_input: data.memo || "",
+        color_input: data.color || scheduleColors[0],
+        is_official_input: String(data.isOfficial) === "true",
+        employee_id_input: data.employeeId || state.auth.employee?.id || null
+      });
+      state.scheduleEditorMode = "";
+      state.selectedScheduleId = "";
+      state.daySheetOpen = true;
+      await refresh({ keepCheckIn: route() === "checkin" });
+      showToast("일정을 저장했습니다.");
     }
 
     if (form.dataset.form === "register") {

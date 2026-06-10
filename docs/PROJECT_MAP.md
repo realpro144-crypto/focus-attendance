@@ -17,6 +17,8 @@
   - Supabase를 처음 만들 때 실행하는 기본 테이블/함수입니다.
 - `supabase/admin-functions.sql`
   - 관리자 계정, 관리자 페이지, 계정 삭제, 비밀번호 변경 기능입니다.
+- `supabase/schedules.sql`
+  - 일정 추가/수정/삭제, 공식 일정, 지점장/지점원 캘린더 권한 기능입니다.
 - `supabase/fix-password-functions.sql`
   - 비밀번호 암호화 함수 보정용 SQL입니다. 보통은 `admin-functions.sql`까지 적용되어 있으면 다시 실행할 일이 많지 않습니다.
 
