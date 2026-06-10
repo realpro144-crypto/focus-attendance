@@ -24,6 +24,8 @@ npm run check
 
 다른 컴퓨터에서 이어서 개발하려면 [개발 환경 준비 문서](docs/DEVELOPMENT.md)를 보면 됩니다.
 
+집 컴퓨터에서 바로 이어받는 순서는 [집에서 이어서 작업하기](docs/HOME_HANDOFF.md)에 따로 정리해 두었습니다.
+
 자주 수정하는 파일 위치는 [프로젝트 지도](docs/PROJECT_MAP.md)에 정리해 두었습니다.
 
 ## Supabase 준비
@@ -33,7 +35,7 @@ npm run check
 3. `supabase/schema.sql` 파일 내용을 전체 복사해서 실행합니다.
 4. 이어서 `supabase/admin-functions.sql` 파일 내용도 전체 복사해서 실행합니다.
 5. 일정 기능을 사용하려면 `supabase/schedules.sql` 파일 내용도 전체 복사해서 실행합니다.
-5. Project Settings > API에서 아래 값을 확인합니다.
+6. Project Settings > API에서 아래 값을 확인합니다.
    - Project URL
    - anon public key
 
