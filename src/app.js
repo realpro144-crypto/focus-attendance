@@ -117,7 +117,8 @@ let state = {
   checkInStatus: "idle",
   checkInError: "",
   checkInAttemptedFor: "",
-  lastCheckIn: null
+  lastCheckIn: null,
+  selectedAccountRowKey: ""
 };
 
 export function startApp(rootElement) {
@@ -509,6 +510,10 @@ function accountInputName(field, company) {
   return `${field}__${company.id}`;
 }
 
+function accountRowKey(type, companyName) {
+  return `${type}:${companyName}`;
+}
+
 function formatBirthDate(value) {
   if (!value) return "미입력";
   const text = String(value);
@@ -565,9 +570,11 @@ function renderInsuranceTableRow(type, company, { fixed = false } = {}) {
   const employeeNumber = account?.employeeNumber || "";
   const password = account?.password || "";
   const extraAuth = account?.extraAuth || "";
+  const rowKey = accountRowKey(type, company.name);
+  const selected = state.selectedAccountRowKey === rowKey;
 
   return `
-    <tr class="${fixed ? "ga-row" : ""}">
+    <tr class="${fixed ? "ga-row" : ""} ${selected ? "selected" : ""}" data-action="select-account-row" data-row-key="${escapeHtml(rowKey)}">
       <th scope="row">${escapeHtml(company.name)}</th>
       <td>${renderInsuranceTableCell("employeeNumber", company, employeeNumber)}</td>
       <td>${renderInsuranceTableCell("password", company, password)}</td>
@@ -586,6 +593,12 @@ function renderInsuranceAccountContent() {
       </div>
       <div class="insurance-table-wrap">
         <table class="insurance-account-table">
+          <colgroup>
+            <col style="width:35%" />
+            <col style="width:20%" />
+            <col style="width:25%" />
+            <col style="width:20%" />
+          </colgroup>
           <thead>
             <tr>
               <th scope="col">회사명</th>
@@ -958,6 +971,7 @@ function clearSession() {
   state.accountSearchOpen = false;
   state.accountEditMode = false;
   state.accountEmployeeId = "";
+  state.selectedAccountRowKey = "";
 }
 
 function renderTopbar() {
@@ -2190,6 +2204,7 @@ document.addEventListener("click", async (event) => {
       window.history.pushState({}, "", "/accounts");
       state.accountEditMode = false;
       state.accountSearch = "";
+      state.selectedAccountRowKey = "";
       await loadState({ keepCheckIn: true });
       renderInsuranceAccountsPage();
     }
@@ -2209,6 +2224,7 @@ document.addEventListener("click", async (event) => {
       state.accountTab = target.dataset.tab || "LIFE";
       state.accountSearch = "";
       state.accountSearchOpen = false;
+      state.selectedAccountRowKey = "";
       renderInsuranceAccountsPage();
     }
 
@@ -2219,6 +2235,12 @@ document.addEventListener("click", async (event) => {
       if (state.accountSearchOpen) {
         window.requestAnimationFrame(() => document.querySelector('[data-action="account-search-input"]')?.focus());
       }
+    }
+
+    if (action === "select-account-row") {
+      if (event.target.closest("input, textarea, select, button")) return;
+      state.selectedAccountRowKey = state.selectedAccountRowKey === target.dataset.rowKey ? "" : target.dataset.rowKey;
+      renderInsuranceAccountsPage();
     }
 
     if (action === "account-edit") {
@@ -2275,6 +2297,7 @@ document.addEventListener("change", async (event) => {
     state.accountEditMode = false;
     state.accountSearch = "";
     state.accountSearchOpen = false;
+    state.selectedAccountRowKey = "";
     renderInsuranceAccountsPage();
   }
 
