@@ -2997,9 +2997,11 @@ button:disabled {
 }
 
 .insurance-account-table th[scope="row"] {
-  position: relative;
-  display: -webkit-box;
   padding-left: 8px;
+}
+
+.insurance-company-name {
+  display: -webkit-box;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: normal;
@@ -3037,15 +3039,8 @@ button:disabled {
   background: #ecfdf5;
 }
 
-.insurance-account-table tr.selected th[scope="row"]::before {
-  content: "";
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  left: 0;
-  width: 4px;
-  border-radius: 999px;
-  background: #10b981;
+.insurance-account-table tr.selected th:first-child {
+  box-shadow: inset 4px 0 0 #10b981;
 }
 
 .insurance-account-table tr {

@@ -575,7 +575,7 @@ function renderInsuranceTableRow(type, company, { fixed = false } = {}) {
 
   return `
     <tr class="${fixed ? "ga-row" : ""} ${selected ? "selected" : ""}" data-action="select-account-row" data-row-key="${escapeHtml(rowKey)}">
-      <th scope="row">${escapeHtml(company.name)}</th>
+      <th scope="row"><span class="insurance-company-name">${escapeHtml(company.name)}</span></th>
       <td>${renderInsuranceTableCell("employeeNumber", company, employeeNumber)}</td>
       <td>${renderInsuranceTableCell("password", company, password)}</td>
       <td>${renderInsuranceTableCell("extraAuth", company, extraAuth)}</td>
