@@ -270,10 +270,113 @@ begin
 end;
 $$;
 
+create or replace function public.register_employee(
+  name_input text,
+  employee_no_input text,
+  password_input text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  clean_name text := regexp_replace(trim(coalesce(name_input, '')), '\s+', ' ', 'g');
+  clean_no text := public.normalize_employee_no(employee_no_input);
+  clean_password text := coalesce(password_input, '');
+  employee_row public.employees;
+  session_token text;
+begin
+  if clean_name = '' then
+    raise exception '이름을 입력해 주세요.';
+  end if;
+
+  if clean_no !~ '^[A-Z0-9._-]{2,24}$' then
+    raise exception '사번은 영문, 숫자, 점, 밑줄, 하이픈으로 2~24자까지 입력할 수 있습니다.';
+  end if;
+
+  if length(clean_password) < 4 then
+    raise exception '비밀번호는 4자 이상 입력해 주세요.';
+  end if;
+
+  update public.employees
+  set employee_no = employee_no || '_DELETED_' || replace(id::text, '-', '')
+  where employee_no = clean_no
+    and active = false;
+
+  if exists (select 1 from public.employees where employee_no = clean_no and active = true) then
+    raise exception '이미 등록된 사번입니다. 로그인해 주세요.';
+  end if;
+
+  insert into public.employees (name, employee_no, password_hash, is_admin)
+  values (
+    clean_name,
+    clean_no,
+    crypt(clean_password, gen_salt('bf')),
+    clean_name = '임동춘' and clean_no = public.normalize_employee_no('80025346')
+  )
+  returning * into employee_row;
+
+  insert into public.employee_sessions (employee_id)
+  values (employee_row.id)
+  returning token into session_token;
+
+  return jsonb_build_object(
+    'employee', jsonb_build_object(
+      'id', employee_row.id,
+      'name', employee_row.name,
+      'employeeNo', employee_row.employee_no,
+      'active', employee_row.active,
+      'isAdmin', employee_row.is_admin,
+      'isSecretary', employee_row.is_secretary,
+      'createdAt', employee_row.created_at
+    ),
+    'token', session_token
+  );
+end;
+$$;
+
+create or replace function public.delete_employee(
+  session_token_input text,
+  employee_id_input uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  admin_row public.employees;
+begin
+  admin_row := public.require_admin_employee(session_token_input);
+
+  if admin_row.id = employee_id_input then
+    raise exception '현재 로그인한 관리자 계정은 삭제할 수 없습니다.';
+  end if;
+
+  update public.employees
+  set active = false,
+      employee_no = employee_no || '_DELETED_' || replace(id::text, '-', '')
+  where id = employee_id_input
+    and active = true;
+
+  if not found then
+    raise exception '해당 지점원을 찾을 수 없습니다.';
+  end if;
+
+  delete from public.employee_sessions
+  where employee_id = employee_id_input;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
 revoke all on table public.insurance_accounts from anon, authenticated;
 revoke all on table public.insurance_company_catalog from anon, authenticated;
 revoke execute on function public.require_insurance_actor(text) from public;
 
 grant usage on schema public to anon, authenticated;
+grant execute on function public.register_employee(text, text, text) to anon, authenticated;
+grant execute on function public.delete_employee(text, uuid) to anon, authenticated;
 grant execute on function public.get_insurance_account_state(text) to anon, authenticated;
 grant execute on function public.upsert_insurance_accounts(text, uuid, jsonb) to anon, authenticated;
