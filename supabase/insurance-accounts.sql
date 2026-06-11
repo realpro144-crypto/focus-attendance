@@ -7,6 +7,15 @@ add column if not exists is_admin boolean not null default false;
 alter table public.employees
 add column if not exists is_secretary boolean not null default false;
 
+alter table public.employees
+add column if not exists birth_date date;
+
+alter table public.employees
+add column if not exists mobile_carrier text;
+
+alter table public.employees
+add column if not exists phone_number text;
+
 create table if not exists public.insurance_company_catalog (
   company_type text not null check (company_type in ('GA', 'LIFE', 'NONLIFE')),
   company_name text not null,
@@ -160,6 +169,9 @@ begin
           'active', e.active,
           'isAdmin', e.is_admin,
           'isSecretary', e.is_secretary,
+          'birthDate', to_char(e.birth_date, 'YYYY-MM-DD'),
+          'mobileCarrier', e.mobile_carrier,
+          'phoneNumber', e.phone_number,
           'createdAt', e.created_at
         )
         order by e.name
@@ -273,7 +285,10 @@ $$;
 create or replace function public.register_employee(
   name_input text,
   employee_no_input text,
-  password_input text
+  password_input text,
+  birth_date_input text,
+  mobile_carrier_input text,
+  phone_number_input text
 )
 returns jsonb
 language plpgsql
@@ -284,6 +299,9 @@ declare
   clean_name text := regexp_replace(trim(coalesce(name_input, '')), '\s+', ' ', 'g');
   clean_no text := public.normalize_employee_no(employee_no_input);
   clean_password text := coalesce(password_input, '');
+  clean_birth_date date;
+  clean_mobile_carrier text := trim(coalesce(mobile_carrier_input, ''));
+  clean_phone_number text := regexp_replace(trim(coalesce(phone_number_input, '')), '\s+', '', 'g');
   employee_row public.employees;
   session_token text;
 begin
@@ -299,6 +317,20 @@ begin
     raise exception '비밀번호는 4자 이상 입력해 주세요.';
   end if;
 
+  begin
+    clean_birth_date := trim(coalesce(birth_date_input, ''))::date;
+  exception when others then
+    raise exception '생년월일을 입력해 주세요.';
+  end;
+
+  if clean_mobile_carrier not in ('SKT', 'KT', 'LGU+', 'SKT(알뜰)', 'KT(알뜰)', 'LGU+(알뜰)') then
+    raise exception '통신사를 선택해 주세요.';
+  end if;
+
+  if clean_phone_number = '' then
+    raise exception '핸드폰번호를 입력해 주세요.';
+  end if;
+
   update public.employees
   set employee_no = employee_no || '_DELETED_' || replace(id::text, '-', '')
   where employee_no = clean_no
@@ -308,12 +340,23 @@ begin
     raise exception '이미 등록된 사번입니다. 로그인해 주세요.';
   end if;
 
-  insert into public.employees (name, employee_no, password_hash, is_admin)
+  insert into public.employees (
+    name,
+    employee_no,
+    password_hash,
+    is_admin,
+    birth_date,
+    mobile_carrier,
+    phone_number
+  )
   values (
     clean_name,
     clean_no,
     crypt(clean_password, gen_salt('bf')),
-    clean_name = '임동춘' and clean_no = public.normalize_employee_no('80025346')
+    clean_name = '임동춘' and clean_no = public.normalize_employee_no('80025346'),
+    clean_birth_date,
+    clean_mobile_carrier,
+    clean_phone_number
   )
   returning * into employee_row;
 
@@ -329,6 +372,9 @@ begin
       'active', employee_row.active,
       'isAdmin', employee_row.is_admin,
       'isSecretary', employee_row.is_secretary,
+      'birthDate', to_char(employee_row.birth_date, 'YYYY-MM-DD'),
+      'mobileCarrier', employee_row.mobile_carrier,
+      'phoneNumber', employee_row.phone_number,
       'createdAt', employee_row.created_at
     ),
     'token', session_token
@@ -376,7 +422,7 @@ revoke all on table public.insurance_company_catalog from anon, authenticated;
 revoke execute on function public.require_insurance_actor(text) from public;
 
 grant usage on schema public to anon, authenticated;
-grant execute on function public.register_employee(text, text, text) to anon, authenticated;
+grant execute on function public.register_employee(text, text, text, text, text, text) to anon, authenticated;
 grant execute on function public.delete_employee(text, uuid) to anon, authenticated;
 grant execute on function public.get_insurance_account_state(text) to anon, authenticated;
 grant execute on function public.upsert_insurance_accounts(text, uuid, jsonb) to anon, authenticated;

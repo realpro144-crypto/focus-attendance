@@ -12,6 +12,7 @@ const scheduleTypes = [
 ];
 const loginAssetsPath = "/assets/login";
 const calendarAssetsPath = "/assets/calendar";
+const mobileCarriers = ["SKT", "KT", "LGU+", "SKT(알뜰)", "KT(알뜰)", "LGU+(알뜰)"];
 const defaultScheduleColor = "#10B981";
 const pastelScheduleColors = [
   "#10B981",
@@ -104,6 +105,7 @@ let state = {
   calendarSearchQuery: "",
   accountTab: "LIFE",
   accountSearch: "",
+  accountSearchOpen: false,
   accountEditMode: false,
   accountEmployeeId: "",
   authMode: "login",
@@ -507,6 +509,24 @@ function accountInputName(field, company) {
   return `${field}__${company.id}`;
 }
 
+function formatBirthDate(value) {
+  if (!value) return "미입력";
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    const [year, month, day] = text.split("-");
+    return `${year}.${month}.${day}`;
+  }
+  return text;
+}
+
+function employeePrivateDetails(employee) {
+  return {
+    birthDate: formatBirthDate(employee?.birthDate),
+    mobileCarrier: accountDisplayValue(employee?.mobileCarrier),
+    phoneNumber: accountDisplayValue(employee?.phoneNumber)
+  };
+}
+
 function currentInsuranceCompanies() {
   const query = state.accountSearch.trim().toLowerCase();
   return insuranceCompanies[state.accountTab].filter((company) =>
@@ -532,56 +552,57 @@ function renderAccountInput(label, field, company, value) {
   `;
 }
 
-function renderInsuranceAccountCard(type, company, { fixed = false } = {}) {
+function renderInsuranceTableCell(field, company, value) {
+  if (!state.accountEditMode) {
+    return `<span class="${value ? "" : "empty"}">${escapeHtml(accountDisplayValue(value))}</span>`;
+  }
+
+  return `<input class="input insurance-table-input" name="${accountInputName(field, company)}" value="${escapeHtml(value || "")}" placeholder="미입력" autocomplete="off" />`;
+}
+
+function renderInsuranceTableRow(type, company, { fixed = false } = {}) {
   const account = accountLookup(type, company.name);
   const employeeNumber = account?.employeeNumber || "";
   const password = account?.password || "";
   const extraAuth = account?.extraAuth || "";
 
   return `
-    <article class="insurance-account-card ${fixed ? "ga-fixed-card" : ""}">
-      <header>
-        <div>
-          <span>${type === "GA" ? "GA" : type === "LIFE" ? "생명보험" : "손해보험"}</span>
-          <h3>${escapeHtml(company.name)}</h3>
-        </div>
-      </header>
-      <div class="insurance-card-fields ${state.accountEditMode ? "editing" : ""}">
-        ${
-          state.accountEditMode
-            ? `
-              ${renderAccountInput("사번", "employeeNumber", company, employeeNumber)}
-              ${renderAccountInput("비밀번호", "password", company, password)}
-              ${renderAccountInput("기타인증", "extraAuth", company, extraAuth)}
-            `
-            : `
-              ${renderAccountValue("사번", employeeNumber)}
-              ${renderAccountValue("비밀번호", password)}
-              ${renderAccountValue("기타인증", extraAuth)}
-            `
-        }
-      </div>
-    </article>
+    <tr class="${fixed ? "ga-row" : ""}">
+      <th scope="row">${escapeHtml(company.name)}</th>
+      <td>${renderInsuranceTableCell("employeeNumber", company, employeeNumber)}</td>
+      <td>${renderInsuranceTableCell("password", company, password)}</td>
+      <td>${renderInsuranceTableCell("extraAuth", company, extraAuth)}</td>
+    </tr>
   `;
 }
 
 function renderInsuranceAccountContent() {
   const companies = currentInsuranceCompanies();
   return `
-    <section class="ga-card-section">
-      ${renderInsuranceAccountCard("GA", insuranceCompanies.GA[0], { fixed: true })}
-    </section>
     <section class="insurance-list-section">
       <div class="insurance-list-title">
         <h2>${state.accountTab === "LIFE" ? "생명보험" : "손해보험"}</h2>
         <span>${companies.length}개</span>
       </div>
-      <div class="insurance-account-list">
-        ${
-          companies.length
-            ? companies.map((company) => renderInsuranceAccountCard(state.accountTab, company)).join("")
-            : `<div class="sheet-empty">검색 결과가 없습니다.</div>`
-        }
+      <div class="insurance-table-wrap">
+        <table class="insurance-account-table">
+          <thead>
+            <tr>
+              <th scope="col">회사명</th>
+              <th scope="col">사번</th>
+              <th scope="col">비밀번호</th>
+              <th scope="col">기타인증</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${renderInsuranceTableRow("GA", insuranceCompanies.GA[0], { fixed: true })}
+            ${
+              companies.length
+                ? companies.map((company) => renderInsuranceTableRow(state.accountTab, company)).join("")
+                : `<tr><td class="insurance-empty-row" colspan="4">검색 결과가 없습니다.</td></tr>`
+            }
+          </tbody>
+        </table>
       </div>
     </section>
   `;
@@ -607,18 +628,24 @@ function renderInsuranceEmployeeSelector() {
 
 function renderInsuranceAccountsPage() {
   const owner = selectedAccountOwner();
+  const privateDetails = employeePrivateDetails(owner);
   const content = `
     <header class="insurance-page-header">
       <button class="insurance-back-btn" type="button" data-action="go-home">홈</button>
-      <div>
-        <h1>사번/비밀번호</h1>
-        <p>${escapeHtml(owner?.name || "지점원")} 계정 정보</p>
+      <div class="insurance-user-summary">
+        <strong>${escapeHtml(owner?.name || "지점원")}</strong>
+        <span>${escapeHtml(privateDetails.birthDate)} · ${escapeHtml(privateDetails.mobileCarrier)} · ${escapeHtml(privateDetails.phoneNumber)}</span>
       </div>
-      ${
-        state.accountEditMode
-          ? `<button class="insurance-edit-btn" type="button" data-action="account-cancel">취소</button>`
-          : `<button class="insurance-edit-btn" type="button" data-action="account-edit">수정</button>`
-      }
+      <div class="insurance-header-actions">
+        <button class="insurance-search-btn" type="button" data-action="account-search-toggle" title="검색">
+          <span class="search-icon-shape" aria-hidden="true"></span>
+        </button>
+        ${
+          state.accountEditMode
+            ? `<button class="insurance-edit-btn" type="button" data-action="account-cancel">취소</button>`
+            : `<button class="insurance-edit-btn" type="button" data-action="account-edit">수정</button>`
+        }
+      </div>
     </header>
     ${
       state.insuranceAccountError
@@ -631,10 +658,16 @@ function renderInsuranceAccountsPage() {
         : `
           <div class="insurance-controls">
             ${renderInsuranceEmployeeSelector()}
-            <label class="insurance-search">
-              <span>회사명 검색</span>
-              <input class="input" data-action="account-search-input" value="${escapeHtml(state.accountSearch)}" placeholder="예: 삼성" ${state.accountEditMode ? "disabled" : ""} />
-            </label>
+            ${
+              state.accountSearchOpen
+                ? `
+                  <label class="insurance-search">
+                    <span>회사명 검색</span>
+                    <input class="input" data-action="account-search-input" value="${escapeHtml(state.accountSearch)}" placeholder="예: 삼성" ${state.accountEditMode ? "disabled" : ""} />
+                  </label>
+                `
+                : ""
+            }
             <div class="insurance-tabs" role="tablist" aria-label="보험사 구분">
               <button type="button" class="${state.accountTab === "LIFE" ? "active" : ""}" data-action="account-tab" data-tab="LIFE">생명보험</button>
               <button type="button" class="${state.accountTab === "NONLIFE" ? "active" : ""}" data-action="account-tab" data-tab="NONLIFE">손해보험</button>
@@ -859,7 +892,7 @@ async function loadState({ keepCheckIn = false } = {}) {
     ...checkInFields
   };
 
-  if (isAccountsRoute() && state.auth.employee) {
+  if ((isAccountsRoute() || (isAdminRoute() && isAdminEmployee())) && state.auth.employee) {
     await loadInsuranceAccountState();
   }
 }
@@ -922,6 +955,7 @@ function clearSession() {
   state.calendarSearchOpen = false;
   state.calendarSearchQuery = "";
   state.accountSearch = "";
+  state.accountSearchOpen = false;
   state.accountEditMode = false;
   state.accountEmployeeId = "";
 }
@@ -1019,6 +1053,9 @@ function renderEmployeesPanel() {
                               ${employee.isAdmin ? `<em class="admin-chip">관리자</em>` : ""}
                             </span>
                             <span class="employee-meta">${escapeHtml(employeeNoLabel(employee.employeeNo))}</span>
+                            <span class="employee-private-meta">
+                              ${escapeHtml(formatBirthDate(employee.birthDate))} · ${escapeHtml(accountDisplayValue(employee.mobileCarrier))} · ${escapeHtml(accountDisplayValue(employee.phoneNumber))}
+                            </span>
                           </span>
                         </div>
                         <div class="employee-admin-actions">
@@ -1518,6 +1555,33 @@ function renderAuthPanel() {
                 <span class="auth-input-wrap">
                   <img class="input-icon-img" src="${loginAssetsPath}/icon-input-user.svg" alt="" aria-hidden="true" />
                   <input class="input" name="name" autocomplete="name" placeholder="이름을 입력하세요" required />
+                </span>
+              </label>
+            `
+            : ""
+        }
+        ${
+          isRegister
+            ? `
+              <label class="field">
+                <span>생년월일</span>
+                <span class="auth-input-wrap">
+                  <img class="input-icon-img" src="${loginAssetsPath}/icon-input-user.svg" alt="" aria-hidden="true" />
+                  <input class="input" name="birthDate" type="date" autocomplete="bday" required />
+                </span>
+              </label>
+              <label class="field">
+                <span>통신사</span>
+                <select class="select auth-select" name="mobileCarrier" required>
+                  <option value="">통신사를 선택하세요</option>
+                  ${mobileCarriers.map((carrier) => `<option value="${escapeHtml(carrier)}">${escapeHtml(carrier)}</option>`).join("")}
+                </select>
+              </label>
+              <label class="field">
+                <span>핸드폰번호</span>
+                <span class="auth-input-wrap">
+                  <img class="input-icon-img" src="${loginAssetsPath}/icon-input-user.svg" alt="" aria-hidden="true" />
+                  <input class="input" name="phoneNumber" autocomplete="tel" inputmode="tel" placeholder="01012345678" required />
                 </span>
               </label>
             `
@@ -2144,12 +2208,23 @@ document.addEventListener("click", async (event) => {
     if (action === "account-tab") {
       state.accountTab = target.dataset.tab || "LIFE";
       state.accountSearch = "";
+      state.accountSearchOpen = false;
       renderInsuranceAccountsPage();
+    }
+
+    if (action === "account-search-toggle") {
+      state.accountSearchOpen = !state.accountSearchOpen;
+      if (!state.accountSearchOpen) state.accountSearch = "";
+      renderInsuranceAccountsPage();
+      if (state.accountSearchOpen) {
+        window.requestAnimationFrame(() => document.querySelector('[data-action="account-search-input"]')?.focus());
+      }
     }
 
     if (action === "account-edit") {
       state.accountEditMode = true;
       state.accountSearch = "";
+      state.accountSearchOpen = false;
       renderInsuranceAccountsPage();
     }
 
@@ -2199,6 +2274,7 @@ document.addEventListener("change", async (event) => {
     state.accountEmployeeId = event.target.value;
     state.accountEditMode = false;
     state.accountSearch = "";
+    state.accountSearchOpen = false;
     renderInsuranceAccountsPage();
   }
 
@@ -2338,7 +2414,10 @@ document.addEventListener("submit", async (event) => {
       const result = await callRpc("register_employee", {
         name_input: data.name,
         employee_no_input: data.employeeNo,
-        password_input: data.password
+        password_input: data.password,
+        birth_date_input: data.birthDate,
+        mobile_carrier_input: data.mobileCarrier,
+        phone_number_input: data.phoneNumber
       });
       saveSession(result.token, result.employee);
       await loadState({ keepCheckIn: true });

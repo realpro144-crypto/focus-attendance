@@ -11,6 +11,10 @@
     {
       "source": "/calendar",
       "destination": "/index.html"
+    },
+    {
+      "source": "/accounts",
+      "destination": "/index.html"
     }
   ]
 }
