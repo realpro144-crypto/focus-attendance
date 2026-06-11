@@ -579,11 +579,12 @@ function renderAccountInput(label, field, company, value) {
 }
 
 function renderInsuranceTableCell(field, company, value) {
+  const displayValue = String(value || "").trim();
   if (!state.accountEditMode) {
-    return `<span class="${value ? "" : "empty"}">${escapeHtml(accountDisplayValue(value))}</span>`;
+    return `<span class="${displayValue ? "" : "empty"}">${escapeHtml(displayValue)}</span>`;
   }
 
-  return `<input class="input insurance-table-input" name="${accountInputName(field, company)}" value="${escapeHtml(value || "")}" placeholder="미입력" autocomplete="off" enterkeyhint="done" />`;
+  return `<input class="input insurance-table-input" name="${accountInputName(field, company)}" value="${escapeHtml(displayValue)}" autocomplete="off" enterkeyhint="done" />`;
 }
 
 function renderInsuranceTableRow(type, company, { fixed = false } = {}) {
