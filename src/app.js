@@ -584,7 +584,7 @@ function renderInsuranceTableCell(field, company, value) {
     return `<span class="${displayValue ? "" : "empty"}">${escapeHtml(displayValue)}</span>`;
   }
 
-  return `<input class="input insurance-table-input" name="${accountInputName(field, company)}" value="${escapeHtml(displayValue)}" autocomplete="off" enterkeyhint="done" />`;
+  return `<input class="input insurance-table-input ${displayValue ? "" : "empty-input"}" name="${accountInputName(field, company)}" value="${escapeHtml(displayValue)}" autocomplete="off" enterkeyhint="done" />`;
 }
 
 function renderInsuranceTableRow(type, company, { fixed = false } = {}) {
