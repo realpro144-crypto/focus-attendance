@@ -12,6 +12,19 @@ const scheduleTypes = [
 ];
 const loginAssetsPath = "/assets/login";
 const calendarAssetsPath = "/assets/calendar";
+const defaultScheduleColor = "#10B981";
+const pastelScheduleColors = [
+  "#10B981",
+  "#A7F3D0",
+  "#93C5FD",
+  "#C4B5FD",
+  "#FBCFE8",
+  "#FDBA74",
+  "#FDE68A",
+  "#67E8F9",
+  "#CBD5E1",
+  "#FCA5A5"
+];
 
 let app = null;
 let supabase = null;
@@ -37,6 +50,11 @@ let state = {
   daySheetOpen: false,
   scheduleEditorMode: "",
   selectedScheduleId: "",
+  scheduleSheetMode: "summary",
+  scheduleDraftColor: defaultScheduleColor,
+  scheduleDraftForm: null,
+  colorPaletteOpen: false,
+  scheduleNoticeOn: false,
   calendarSearchOpen: false,
   calendarSearchQuery: "",
   authMode: "login",
@@ -283,7 +301,7 @@ function normalizedScheduleColor(value) {
 }
 
 function scheduleColor(schedule) {
-  return normalizedScheduleColor(schedule?.color) || scheduleTypeMeta(schedule?.type).color;
+  return normalizedScheduleColor(schedule?.color) || scheduleTypeMeta(schedule?.type).color || defaultScheduleColor;
 }
 
 function scheduleStartDate(schedule) {
@@ -409,6 +427,42 @@ function defaultScheduleScopeValue() {
     return state.employeeFilter !== "all" ? state.employeeFilter : "official";
   }
   return state.auth.employee?.id || "";
+}
+
+function captureScheduleDraft() {
+  const form = document.querySelector('[data-form="schedule"]');
+  if (!form) return null;
+  const data = new FormData(form);
+  return {
+    title: String(data.get("title") || ""),
+    memo: String(data.get("memo") || ""),
+    scope: String(data.get("scope") || ""),
+    startDateTime: String(data.get("startDateTime") || ""),
+    endDateTime: String(data.get("endDateTime") || ""),
+    color: String(data.get("color") || "")
+  };
+}
+
+function memoPreview(value, maxLength = 35) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function timeDisplayParts(timeValue) {
+  const [hourRaw, minute = "00"] = String(timeValue || "00:00").split(":");
+  const hour = Number(hourRaw);
+  const period = hour < 12 ? "오전" : "오후";
+  const displayHour = hour % 12 || 12;
+  return { period, text: `${displayHour}:${minute}` };
+}
+
+function scheduleTimeStack(schedule) {
+  const start = timeDisplayParts(schedule.startTime || "00:00");
+  const end = timeDisplayParts(scheduleEndTime(schedule) || schedule.startTime || "00:00");
+  return {
+    start: `${start.period} ${start.text}`,
+    end: start.period === end.period ? end.text : `${end.period} ${end.text}`
+  };
 }
 
 function showToast(message) {
@@ -718,11 +772,6 @@ function renderCalendarToolbar() {
     month: "long"
   }).format(state.monthCursor);
   const compactMonthTitle = monthTitle.replace("년 ", ". ").replace("월", ".");
-  const searchButton = `
-    <button class="calendar-search-btn" title="일정 검색" data-action="open-calendar-search">
-      <img src="${calendarAssetsPath}/icon-calendar-search.svg" alt="일정 검색" />
-    </button>
-  `;
 
   if (employeeView) {
     return `
@@ -730,7 +779,6 @@ function renderCalendarToolbar() {
         <button class="calendar-nav-btn" title="이전 달" data-action="prev-month">‹</button>
         <button class="calendar-month-title" data-action="today" title="오늘로 이동">${escapeHtml(compactMonthTitle)}</button>
         <button class="calendar-nav-btn" title="다음 달" data-action="next-month">›</button>
-        ${searchButton}
       </div>
     `;
   }
@@ -741,7 +789,6 @@ function renderCalendarToolbar() {
         <button class="icon-btn" title="이전 달" data-action="prev-month">‹</button>
         <button class="icon-btn" title="다음 달" data-action="next-month">›</button>
         <button class="btn secondary" data-action="today">오늘</button>
-        ${searchButton}
       </div>
       <h2 class="month-title">${escapeHtml(monthTitle)}</h2>
       <label class="field calendar-filter">
@@ -789,7 +836,7 @@ function renderCalendar() {
               const key = toDateKey(day);
               const records = (grouped[key] || []).sort((a, b) => a.localTime.localeCompare(b.localTime));
               const schedules = (scheduleGrouped[key] || []).sort(compareSchedules);
-              const visibleSchedules = schedules.slice(0, employeeView ? 3 : 4);
+              const visibleSchedules = schedules.slice(0, 4);
               const tone = calendarDayTone(day, key);
               const classes = [
                 "day",
@@ -823,7 +870,7 @@ function renderCalendar() {
                         )
                         .join("")
                     }
-                    ${schedules.length > visibleSchedules.length ? `<div class="more">+${schedules.length - visibleSchedules.length}개 더</div>` : ""}
+                    ${schedules.length > visibleSchedules.length ? `<span class="more-schedules">+</span>` : ""}
                   </div>
                 </button>
               `;
@@ -841,67 +888,139 @@ function renderScheduleForm() {
   if (editing && !canManageSchedule(schedule)) return "";
 
   const isAdmin = isAdminEmployee() && isAdminRoute();
-  const startValue = schedule ? scheduleStartValue(schedule) : defaultScheduleStartValue();
-  const endValue = schedule ? scheduleEndValue(schedule) : addHoursToDateTimeLocal(startValue, 1);
-  const selectedType = schedule?.type || (schedule?.isOfficial ? "education" : "personal");
-  const selectedScope = schedule?.isOfficial ? "official" : schedule?.employeeId || defaultScheduleScopeValue();
+  const draft = state.scheduleDraftForm || {};
+  const baseStartValue = schedule ? scheduleStartValue(schedule) : defaultScheduleStartValue();
+  const startValue = draft.startDateTime || baseStartValue;
+  const endValue = draft.endDateTime || (schedule ? scheduleEndValue(schedule) : addHoursToDateTimeLocal(startValue, 1));
+  const selectedScope = draft.scope || (schedule?.isOfficial ? "official" : schedule?.employeeId || defaultScheduleScopeValue());
+  const selectedColor = state.scheduleDraftColor || draft.color || scheduleColor(schedule) || defaultScheduleColor;
+  const noticeOn = isAdmin && state.scheduleNoticeOn;
+  const titleValue = draft.title ?? schedule?.title ?? "";
+  const memoValue = draft.memo ?? schedule?.memo ?? "";
 
   return `
     <form class="schedule-form" data-form="schedule" data-schedule-id="${escapeHtml(schedule?.id || "")}">
-      <label class="field">
-        <span>제목</span>
-        <input class="input schedule-title-input" name="title" maxlength="40" placeholder="제목을 입력하세요" value="${escapeHtml(schedule?.title || "")}" required />
-      </label>
-      <label class="field">
-        <span>유형</span>
-        <select class="select schedule-type-select" name="type">
-          ${scheduleTypes
-            .map(
-              (type) => `<option value="${type.value}"${selectedType === type.value ? " selected" : ""}>${escapeHtml(type.label)}</option>`
-            )
-            .join("")}
-        </select>
-      </label>
+      <div class="schedule-title-row">
+        <span class="selected-color-dot" style="background:${selectedColor}"></span>
+        <input class="input schedule-title-input" name="title" maxlength="40" placeholder="일정을 입력하세요" value="${escapeHtml(titleValue)}" required />
+        ${isAdmin ? `<button class="notice-toggle ${noticeOn ? "active" : ""}" type="button" data-action="toggle-notice">${noticeOn ? "공지 on" : "공지"}</button>` : ""}
+      </div>
+      <input type="hidden" name="color" value="${escapeHtml(selectedColor)}" />
+      <input type="hidden" name="type" value="personal" />
+      <div class="color-control">
+        <button class="color-tab" type="button" data-action="toggle-color-palette">색상</button>
+        ${
+          state.colorPaletteOpen
+            ? `
+              <div class="color-palette">
+                ${pastelScheduleColors
+                  .map(
+                    (color) => `
+                      <button class="palette-color ${selectedColor.toUpperCase() === color.toUpperCase() ? "selected" : ""}" type="button" data-action="select-schedule-color" data-color="${color}" style="background:${color}" title="${color}"></button>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : ""
+        }
+      </div>
       ${
         isAdmin
           ? `
-            <label class="field">
-              <span>대상</span>
-              <select class="select" name="scope">
-                <option value="official"${selectedScope === "official" ? " selected" : ""}>공식 일정 - 전체 지점원</option>
-                ${activeEmployees()
-                  .map(
-                    (employee) =>
-                      `<option value="${employee.id}"${selectedScope === employee.id ? " selected" : ""}>${escapeHtml(employee.name)} (${escapeHtml(employeeNoLabel(employee.employeeNo))})</option>`
-                  )
-                  .join("")}
-              </select>
-            </label>
+            ${
+              noticeOn
+                ? `<input type="hidden" name="scope" value="official" />`
+                : `
+                  <label class="field">
+                    <span>대상</span>
+                    <select class="select" name="scope">
+                      ${activeEmployees()
+                        .map(
+                          (employee) =>
+                            `<option value="${employee.id}"${selectedScope === employee.id ? " selected" : ""}>${escapeHtml(employee.name)} (${escapeHtml(employeeNoLabel(employee.employeeNo))})</option>`
+                        )
+                        .join("")}
+                    </select>
+                  </label>
+                `
+            }
           `
           : `
             <input type="hidden" name="scope" value="${escapeHtml(state.auth.employee?.id || "")}" />
           `
       }
       <div class="schedule-time-grid stacked">
-        <label class="field">
-          <span>시작일시</span>
+        <label class="field compact-time-field">
           <input class="input schedule-datetime-input" name="startDateTime" type="datetime-local" value="${escapeHtml(startValue)}" required />
         </label>
-        <label class="field">
-          <span>종료일시</span>
+        <div class="time-separator">~</div>
+        <label class="field compact-time-field">
           <input class="input schedule-datetime-input" name="endDateTime" type="datetime-local" value="${escapeHtml(endValue)}" required />
-          <small class="field-hint">기본값은 시작일시 기준 1시간 후입니다.</small>
         </label>
       </div>
       <label class="field">
         <span>메모</span>
-        <textarea class="input textarea" name="memo" maxlength="300" placeholder="필요한 내용을 간단히 적어주세요.">${escapeHtml(schedule?.memo || "")}</textarea>
+        <textarea class="input textarea" name="memo" maxlength="300" placeholder="필요한 내용을 간단히 적어주세요.">${escapeHtml(memoValue)}</textarea>
       </label>
       <div class="sheet-actions">
         <button class="btn secondary" type="button" data-action="cancel-schedule-edit">취소</button>
         <button class="btn primary" type="submit">일정 저장</button>
       </div>
     </form>
+  `;
+}
+
+function renderScheduleSummaryRow(schedule) {
+  const times = scheduleTimeStack(schedule);
+  const preview = memoPreview(schedule.memo);
+  return `
+    <button class="summary-schedule-row" type="button" data-action="select-schedule" data-schedule-id="${escapeHtml(schedule.id)}">
+      <span class="summary-time">
+        <strong>${escapeHtml(times.start)}</strong>
+        <small>${escapeHtml(times.end)}</small>
+      </span>
+      <span class="summary-color-bar" style="background:${scheduleColor(schedule)}"></span>
+      <span class="summary-main">
+        <strong>${escapeHtml(schedule.title)}</strong>
+        ${preview ? `<small>${escapeHtml(preview)}</small>` : `<small>메모 없음</small>`}
+      </span>
+    </button>
+  `;
+}
+
+function renderScheduleDetailView(schedule) {
+  if (!schedule) return "";
+  return `
+    <article class="schedule-detail-sheet-card" style="--schedule-color:${scheduleColor(schedule)}">
+      <div class="detail-color-line"></div>
+      <header class="detail-title-row">
+        <div>
+          <span>${escapeHtml(scheduleOwnerLabel(schedule))}</span>
+          <h3>${escapeHtml(schedule.title)}</h3>
+        </div>
+        ${
+          canManageSchedule(schedule)
+            ? `
+              <div class="detail-icon-actions">
+                <button type="button" data-action="edit-schedule" data-schedule-id="${escapeHtml(schedule.id)}" title="수정">수정</button>
+                <button type="button" data-action="delete-schedule" data-schedule-id="${escapeHtml(schedule.id)}" title="삭제">삭제</button>
+              </div>
+            `
+            : ""
+        }
+      </header>
+      <dl class="schedule-detail-meta">
+        <div>
+          <dt>시간</dt>
+          <dd>${escapeHtml(scheduleTimeLabel(schedule))}</dd>
+        </div>
+        <div>
+          <dt>메모</dt>
+          <dd>${schedule.memo ? escapeHtml(schedule.memo) : "메모가 없습니다."}</dd>
+        </div>
+      </dl>
+    </article>
   `;
 }
 
@@ -912,10 +1031,13 @@ function renderDaySheet() {
   const schedules = schedulesForDate(state.selectedDate);
   const selectedSchedule = scheduleById(state.selectedScheduleId);
   const showEditor = state.scheduleEditorMode === "create" || state.scheduleEditorMode === "edit";
+  const showDetail = !showEditor && state.scheduleSheetMode === "detail" && selectedSchedule;
   const sheetTitle = showEditor
     ? state.scheduleEditorMode === "edit"
       ? "일정 수정"
       : "일정 추가"
+    : showDetail
+      ? formatFullDate(scheduleStartDate(selectedSchedule))
     : formatFullDate(state.selectedDate);
 
   return `
@@ -924,7 +1046,6 @@ function renderDaySheet() {
       <div class="sheet-handle" aria-hidden="true"></div>
       <header class="sheet-header">
         <div>
-          ${showEditor ? "" : `<span>선택한 날짜</span>`}
           <h2>${escapeHtml(sheetTitle)}</h2>
         </div>
         <button class="sheet-close" type="button" data-action="close-day-sheet" title="닫기">×</button>
@@ -933,6 +1054,8 @@ function renderDaySheet() {
       ${
         showEditor
           ? renderScheduleForm()
+          : showDetail
+            ? renderScheduleDetailView(selectedSchedule)
           : `
             ${
               records.length
@@ -958,53 +1081,16 @@ function renderDaySheet() {
                 <h3>일정 (${schedules.length})</h3>
                 <button class="mini-btn primary" type="button" data-action="add-schedule">일정 추가</button>
               </div>
-              <div class="schedule-detail-list">
+              <div class="schedule-summary-list">
                 ${
                   schedules.length
                     ? schedules
-                        .map((schedule) => {
-                          const color = scheduleColor(schedule);
-                          const selected = schedule.id === state.selectedScheduleId;
-                          return `
-                            <div class="schedule-detail-row ${selected ? "selected" : ""}">
-                              <button class="schedule-row-main" type="button" data-action="select-schedule" data-schedule-id="${escapeHtml(schedule.id)}">
-                                <span class="schedule-color-dot" style="background:${color}"></span>
-                                <span>
-                                  <strong>${escapeHtml(schedule.title)}</strong>
-                                  <small>${escapeHtml(scheduleOwnerLabel(schedule))} · ${escapeHtml(scheduleTimeLabel(schedule))}</small>
-                                </span>
-                              </button>
-                              ${
-                                canManageSchedule(schedule)
-                                  ? `
-                                    <div class="schedule-row-actions">
-                                      <button type="button" data-action="edit-schedule" data-schedule-id="${escapeHtml(schedule.id)}">수정</button>
-                                      <button type="button" data-action="delete-schedule" data-schedule-id="${escapeHtml(schedule.id)}">삭제</button>
-                                    </div>
-                                  `
-                                  : ""
-                              }
-                            </div>
-                          `;
-                        })
+                        .map((schedule) => renderScheduleSummaryRow(schedule))
                         .join("")
                     : `<div class="sheet-empty">등록된 일정이 없습니다.</div>`
                 }
               </div>
             </div>
-
-            ${
-              selectedSchedule
-                ? `
-                  <article class="schedule-preview-card" style="--schedule-color:${scheduleColor(selectedSchedule)}">
-                    <span>${escapeHtml(scheduleOwnerLabel(selectedSchedule))}</span>
-                    <h3>${escapeHtml(selectedSchedule.title)}</h3>
-                    <p>${escapeHtml(scheduleTimeLabel(selectedSchedule))}</p>
-                    <p>${selectedSchedule.memo ? escapeHtml(selectedSchedule.memo) : "메모가 없습니다."}</p>
-                  </article>
-                `
-                : ""
-            }
           `
       }
     </section>
@@ -1019,10 +1105,39 @@ function searchedSchedules() {
     .sort((a, b) => scheduleStartDate(a).localeCompare(scheduleStartDate(b)) || compareSchedules(a, b));
 }
 
+function renderCalendarSearchResults() {
+  const results = searchedSchedules();
+  return `
+    <h3>검색 결과 (${results.length})</h3>
+    ${
+      state.calendarSearchQuery.trim()
+        ? results.length
+          ? results
+              .map(
+                (schedule) => `
+                  <button class="calendar-search-result" type="button" data-action="open-search-result" data-schedule-id="${escapeHtml(schedule.id)}">
+                    <span class="search-result-date">
+                      <b>${Number(scheduleStartDate(schedule).slice(8, 10))}</b>
+                      <small>${escapeHtml(formatWeekdayShort(scheduleStartDate(schedule)))}</small>
+                    </span>
+                    <span class="search-result-main">
+                      <strong>${escapeHtml(schedule.title)}</strong>
+                      <small>${escapeHtml(scheduleTimeLabel(schedule))}</small>
+                    </span>
+                    <span class="search-result-arrow">›</span>
+                  </button>
+                `
+              )
+              .join("")
+          : `<div class="sheet-empty">검색 결과가 없습니다.</div>`
+        : `<div class="sheet-empty">검색어를 입력하면 일정이 표시됩니다.</div>`
+    }
+  `;
+}
+
 function renderCalendarSearch() {
   if (!state.calendarSearchOpen || !state.auth.employee) return "";
 
-  const results = searchedSchedules();
   return `
     <div class="calendar-search-backdrop" data-action="close-calendar-search"></div>
     <section class="calendar-search-panel" role="dialog" aria-modal="true" aria-label="일정 검색">
@@ -1035,30 +1150,7 @@ function renderCalendarSearch() {
         <input class="calendar-search-input" data-action="calendar-search-input" value="${escapeHtml(state.calendarSearchQuery)}" placeholder="일정 제목을 입력하세요" autocomplete="off" />
       </label>
       <div class="calendar-search-results">
-        <h3>검색 결과 (${results.length})</h3>
-        ${
-          state.calendarSearchQuery.trim()
-            ? results.length
-              ? results
-                  .map(
-                    (schedule) => `
-                      <button class="calendar-search-result" type="button" data-action="open-search-result" data-schedule-id="${escapeHtml(schedule.id)}">
-                        <span class="search-result-date">
-                          <b>${Number(scheduleStartDate(schedule).slice(8, 10))}</b>
-                          <small>${escapeHtml(formatWeekdayShort(scheduleStartDate(schedule)))}</small>
-                        </span>
-                        <span class="search-result-main">
-                          <strong>${escapeHtml(schedule.title)}</strong>
-                          <small>${escapeHtml(scheduleTimeLabel(schedule))}</small>
-                        </span>
-                        <span class="search-result-arrow">›</span>
-                      </button>
-                    `
-                  )
-                  .join("")
-              : `<div class="sheet-empty">검색 결과가 없습니다.</div>`
-            : `<div class="sheet-empty">검색어를 입력하면 일정이 표시됩니다.</div>`
-        }
+        ${renderCalendarSearchResults()}
       </div>
     </section>
   `;
@@ -1353,6 +1445,7 @@ function renderEmployeeCalendarPage() {
         ${state.auth.employee ? renderCalendar() : renderAuthPanel()}
       </main>
       <button class="calendar-home-btn" data-action="go-home" title="홈">홈</button>
+      ${state.auth.employee ? `<button class="calendar-search-fab" data-action="open-calendar-search" title="일정 검색"><img src="${calendarAssetsPath}/icon-calendar-search.svg" alt="일정 검색" /></button>` : ""}
       ${state.auth.employee ? `<button class="calendar-fab" data-action="add-schedule" title="일정 추가">+</button>` : ""}
       ${state.auth.employee ? renderDaySheet() : ""}
       ${state.auth.employee ? renderCalendarSearch() : ""}
@@ -1561,6 +1654,7 @@ document.addEventListener("click", async (event) => {
       state.daySheetOpen = false;
       state.scheduleEditorMode = "";
       state.selectedScheduleId = "";
+      state.scheduleSheetMode = "summary";
       render();
     }
 
@@ -1571,6 +1665,7 @@ document.addEventListener("click", async (event) => {
       state.daySheetOpen = true;
       state.scheduleEditorMode = "";
       state.selectedScheduleId = "";
+      state.scheduleSheetMode = "summary";
       render();
     }
 
@@ -1579,6 +1674,7 @@ document.addEventListener("click", async (event) => {
       state.daySheetOpen = true;
       state.scheduleEditorMode = "";
       state.selectedScheduleId = "";
+      state.scheduleSheetMode = "summary";
       render();
     }
 
@@ -1586,6 +1682,7 @@ document.addEventListener("click", async (event) => {
       state.daySheetOpen = false;
       state.scheduleEditorMode = "";
       state.selectedScheduleId = "";
+      state.scheduleSheetMode = "summary";
       render();
     }
 
@@ -1594,6 +1691,7 @@ document.addEventListener("click", async (event) => {
       state.daySheetOpen = false;
       state.scheduleEditorMode = "";
       state.selectedScheduleId = "";
+      state.scheduleSheetMode = "summary";
       render();
       window.requestAnimationFrame(() => document.querySelector(".calendar-search-input")?.focus());
     }
@@ -1613,6 +1711,7 @@ document.addEventListener("click", async (event) => {
       state.selectedDate = dateKey;
       state.selectedScheduleId = schedule.id;
       state.scheduleEditorMode = "";
+      state.scheduleSheetMode = "detail";
       state.daySheetOpen = true;
       state.calendarSearchOpen = false;
       state.calendarSearchQuery = "";
@@ -1622,6 +1721,11 @@ document.addEventListener("click", async (event) => {
     if (action === "add-schedule") {
       state.scheduleEditorMode = "create";
       state.selectedScheduleId = "";
+      state.scheduleSheetMode = "input";
+      state.scheduleDraftColor = defaultScheduleColor;
+      state.scheduleDraftForm = null;
+      state.colorPaletteOpen = false;
+      state.scheduleNoticeOn = false;
       state.daySheetOpen = true;
       render();
     }
@@ -1629,19 +1733,59 @@ document.addEventListener("click", async (event) => {
     if (action === "select-schedule") {
       state.selectedScheduleId = target.dataset.scheduleId;
       state.scheduleEditorMode = "";
+      state.scheduleSheetMode = "detail";
       state.daySheetOpen = true;
       render();
     }
 
     if (action === "edit-schedule") {
+      const schedule = scheduleById(target.dataset.scheduleId);
       state.selectedScheduleId = target.dataset.scheduleId;
       state.scheduleEditorMode = "edit";
+      state.scheduleSheetMode = "input";
+      state.scheduleDraftColor = schedule ? scheduleColor(schedule) : defaultScheduleColor;
+      state.scheduleDraftForm = null;
+      state.colorPaletteOpen = false;
+      state.scheduleNoticeOn = Boolean(schedule?.isOfficial);
       state.daySheetOpen = true;
       render();
     }
 
     if (action === "cancel-schedule-edit") {
       state.scheduleEditorMode = "";
+      state.scheduleSheetMode = state.selectedScheduleId ? "detail" : "summary";
+      state.scheduleDraftForm = null;
+      state.colorPaletteOpen = false;
+      render();
+    }
+
+    if (action === "toggle-color-palette") {
+      state.scheduleDraftForm = captureScheduleDraft();
+      state.colorPaletteOpen = !state.colorPaletteOpen;
+      render();
+    }
+
+    if (action === "select-schedule-color") {
+      const color = target.dataset.color || defaultScheduleColor;
+      state.scheduleDraftColor = color;
+      state.colorPaletteOpen = false;
+      state.scheduleDraftForm = captureScheduleDraft();
+      const form = target.closest("form");
+      if (form) {
+        const colorInput = form.querySelector('input[name="color"]');
+        const colorDot = form.querySelector(".selected-color-dot");
+        const palette = form.querySelector(".color-palette");
+        if (colorInput) colorInput.value = color;
+        if (colorDot) colorDot.style.background = color;
+        if (palette) palette.remove();
+      } else {
+        render();
+      }
+    }
+
+    if (action === "toggle-notice") {
+      state.scheduleDraftForm = captureScheduleDraft();
+      state.scheduleNoticeOn = !state.scheduleNoticeOn;
       render();
     }
 
@@ -1655,6 +1799,8 @@ document.addEventListener("click", async (event) => {
       });
       state.selectedScheduleId = "";
       state.scheduleEditorMode = "";
+      state.scheduleSheetMode = "summary";
+      state.scheduleDraftForm = null;
       state.daySheetOpen = true;
       await refresh({ keepCheckIn: route() === "checkin" });
       showToast("일정을 삭제했습니다.");
@@ -1735,12 +1881,8 @@ document.addEventListener("change", async (event) => {
 document.addEventListener("input", (event) => {
   if (event.target.dataset.action === "calendar-search-input") {
     state.calendarSearchQuery = event.target.value;
-    render();
-    window.requestAnimationFrame(() => {
-      const input = document.querySelector(".calendar-search-input");
-      input?.focus();
-      input?.setSelectionRange(input.value.length, input.value.length);
-    });
+    const results = document.querySelector(".calendar-search-results");
+    if (results) results.innerHTML = renderCalendarSearchResults();
     return;
   }
 
@@ -1755,6 +1897,12 @@ document.addEventListener("input", (event) => {
   const form = event.target.closest('form[data-form="register"]');
   if (!form || !["password", "passwordConfirm"].includes(event.target.name)) return;
   updatePasswordConfirmState(form, { showError: Boolean(form.elements.passwordConfirm.value) });
+});
+
+document.addEventListener("focusin", (event) => {
+  const field = event.target.closest(".schedule-form input, .schedule-form textarea");
+  if (!field) return;
+  window.setTimeout(() => field.scrollIntoView({ block: "center", behavior: "smooth" }), 120);
 });
 
 document.addEventListener("submit", async (event) => {
@@ -1805,13 +1953,18 @@ document.addEventListener("submit", async (event) => {
         start_datetime_input: data.startDateTime,
         end_datetime_input: data.endDateTime,
         memo_input: data.memo || "",
-        type_input: data.type || "personal",
-        color_input: scheduleTypeMeta(data.type).color,
+        type_input: "personal",
+        color_input: data.color || defaultScheduleColor,
         is_official_input: scope === "official",
         employee_id_input: scope === "official" ? null : scope
       });
       state.scheduleEditorMode = "";
-      state.selectedScheduleId = savedSchedule?.id || "";
+      state.selectedScheduleId = "";
+      state.scheduleSheetMode = "summary";
+      state.colorPaletteOpen = false;
+      state.scheduleDraftColor = defaultScheduleColor;
+      state.scheduleDraftForm = null;
+      state.scheduleNoticeOn = false;
       state.selectedDate = savedSchedule?.startDateKey || state.selectedDate;
       state.monthCursor = new Date(
         dateFromKey(state.selectedDate).getFullYear(),
