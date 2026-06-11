@@ -41,7 +41,7 @@ const insuranceCompanies = {
     { id: "life-metlife", name: "메트라이프" },
     { id: "life-samsung", name: "삼성생명" },
     { id: "life-abl", name: "ABL생명" },
-    { id: "life-bnp", name: "BNP PARIBAS" },
+    { id: "life-bnp", name: "BNP" },
     { id: "life-nh", name: "NH농협생명" },
     { id: "life-shinhan", name: "신한라이프" },
     { id: "life-ibk", name: "IBK연금보험" },
@@ -493,11 +493,12 @@ function selectedAccountOwner() {
 }
 
 function accountLookup(type, companyName, ownerId = selectedAccountOwnerId()) {
+  const legacyCompanyName = companyName === "BNP" ? "BNP PARIBAS" : companyName;
   return (state.insuranceAccounts || []).find(
     (account) =>
       account.ownerUserId === ownerId &&
       account.companyType === type &&
-      account.companyName === companyName
+      (account.companyName === companyName || account.companyName === legacyCompanyName)
   );
 }
 
@@ -532,11 +533,31 @@ function employeePrivateDetails(employee) {
   };
 }
 
-function currentInsuranceCompanies() {
+function currentInsuranceRows() {
   const query = state.accountSearch.trim().toLowerCase();
-  return insuranceCompanies[state.accountTab].filter((company) =>
-    company.name.toLowerCase().includes(query)
-  );
+  const source = query
+    ? [
+        ...insuranceCompanies.LIFE.map((company) => ({ type: "LIFE", company })),
+        ...insuranceCompanies.NONLIFE.map((company) => ({ type: "NONLIFE", company }))
+      ]
+    : insuranceCompanies[state.accountTab].map((company) => ({ type: state.accountTab, company }));
+
+  return source.filter(({ company }) => company.name.toLowerCase().includes(query));
+}
+
+function insuranceCompanyNameHtml(name) {
+  const breakMap = {
+    "NH농협손해보험": "NH농협<wbr>손해보험",
+    "NH농협생명": "NH농협<wbr>생명",
+    "푸본현대생명": "푸본현대<wbr>생명",
+    "KB생명보험": "KB<wbr>생명보험",
+    "KB손해보험": "KB<wbr>손해보험",
+    "DB손해보험": "DB<wbr>손해보험",
+    "DB생명": "DB<wbr>생명",
+    "AIG손해보험": "AIG<wbr>손해보험",
+    "CHUBB손해보험": "CHUBB<wbr>손해보험"
+  };
+  return breakMap[name] || escapeHtml(name);
 }
 
 function renderAccountValue(label, value) {
@@ -575,7 +596,7 @@ function renderInsuranceTableRow(type, company, { fixed = false } = {}) {
 
   return `
     <tr class="${fixed ? "ga-row" : ""} ${selected ? "selected" : ""}" data-action="select-account-row" data-row-key="${escapeHtml(rowKey)}">
-      <th scope="row"><span class="insurance-company-name">${escapeHtml(company.name)}</span></th>
+      <th scope="row"><span class="insurance-company-name">${insuranceCompanyNameHtml(company.name)}</span></th>
       <td>${renderInsuranceTableCell("employeeNumber", company, employeeNumber)}</td>
       <td>${renderInsuranceTableCell("password", company, password)}</td>
       <td>${renderInsuranceTableCell("extraAuth", company, extraAuth)}</td>
@@ -584,19 +605,20 @@ function renderInsuranceTableRow(type, company, { fixed = false } = {}) {
 }
 
 function renderInsuranceAccountContent() {
-  const companies = currentInsuranceCompanies();
+  const rows = currentInsuranceRows();
+  const searching = Boolean(state.accountSearch.trim());
   return `
     <section class="insurance-list-section">
       <div class="insurance-list-title">
-        <h2>${state.accountTab === "LIFE" ? "생명보험" : "손해보험"}</h2>
-        <span>${companies.length}개</span>
+        <h2>${searching ? "검색 결과" : state.accountTab === "LIFE" ? "생명보험" : "손해보험"}</h2>
+        <span>${rows.length}개</span>
       </div>
       <div class="insurance-table-wrap">
         <table class="insurance-account-table">
           <colgroup>
-            <col style="width:35%" />
+            <col style="width:30%" />
             <col style="width:20%" />
-            <col style="width:25%" />
+            <col style="width:30%" />
             <col style="width:20%" />
           </colgroup>
           <thead>
@@ -610,8 +632,8 @@ function renderInsuranceAccountContent() {
           <tbody>
             ${renderInsuranceTableRow("GA", insuranceCompanies.GA[0], { fixed: true })}
             ${
-              companies.length
-                ? companies.map((company) => renderInsuranceTableRow(state.accountTab, company)).join("")
+              rows.length
+                ? rows.map(({ type, company }) => renderInsuranceTableRow(type, company)).join("")
                 : `<tr><td class="insurance-empty-row" colspan="4">검색 결과가 없습니다.</td></tr>`
             }
           </tbody>
@@ -650,9 +672,6 @@ function renderInsuranceAccountsPage() {
         <span>${escapeHtml(privateDetails.birthDate)} · ${escapeHtml(privateDetails.mobileCarrier)} · ${escapeHtml(privateDetails.phoneNumber)}</span>
       </div>
       <div class="insurance-header-actions">
-        <button class="insurance-search-btn" type="button" data-action="account-search-toggle" title="검색">
-          <span class="search-icon-shape" aria-hidden="true"></span>
-        </button>
         ${
           state.accountEditMode
             ? `<button class="insurance-edit-btn" type="button" data-action="account-cancel">취소</button>`
@@ -671,20 +690,14 @@ function renderInsuranceAccountsPage() {
         : `
           <div class="insurance-controls">
             ${renderInsuranceEmployeeSelector()}
-            ${
-              state.accountSearchOpen
-                ? `
-                  <label class="insurance-search">
-                    <span>회사명 검색</span>
-                    <input class="input" data-action="account-search-input" value="${escapeHtml(state.accountSearch)}" placeholder="예: 삼성" ${state.accountEditMode ? "disabled" : ""} />
-                  </label>
-                `
-                : ""
-            }
             <div class="insurance-tabs" role="tablist" aria-label="보험사 구분">
               <button type="button" class="${state.accountTab === "LIFE" ? "active" : ""}" data-action="account-tab" data-tab="LIFE">생명보험</button>
               <button type="button" class="${state.accountTab === "NONLIFE" ? "active" : ""}" data-action="account-tab" data-tab="NONLIFE">손해보험</button>
             </div>
+            <label class="insurance-search">
+              <span>보험사명 검색</span>
+              <input class="input" data-action="account-search-input" value="${escapeHtml(state.accountSearch)}" placeholder="보험사명 검색" ${state.accountEditMode ? "disabled" : ""} />
+            </label>
           </div>
           <div class="insurance-account-content">
             ${renderInsuranceAccountContent()}
@@ -1581,21 +1594,29 @@ function renderAuthPanel() {
                 <span>생년월일</span>
                 <span class="auth-input-wrap">
                   <img class="input-icon-img" src="${loginAssetsPath}/icon-input-user.svg" alt="" aria-hidden="true" />
-                  <input class="input" name="birthDate" type="date" autocomplete="bday" required />
+                  <input class="input" name="birthDate" type="text" autocomplete="bday" inputmode="numeric" maxlength="8" placeholder="19910202" data-digits-only data-max-length="8" aria-describedby="birth-date-error" required />
                 </span>
+                <small id="birth-date-error" class="field-error hidden" data-birth-date-error>생년월일 8자리를 입력해주세요.</small>
               </label>
-              <label class="field">
+              <label class="field carrier-field">
                 <span>통신사</span>
-                <select class="select auth-select" name="mobileCarrier" required>
-                  <option value="">통신사를 선택하세요</option>
-                  ${mobileCarriers.map((carrier) => `<option value="${escapeHtml(carrier)}">${escapeHtml(carrier)}</option>`).join("")}
-                </select>
+                <input type="hidden" name="mobileCarrier" data-carrier-value />
+                <button class="carrier-select-button" type="button" data-action="toggle-carrier-options" data-carrier-label>통신사를 선택하세요</button>
+                <div class="carrier-options hidden" data-carrier-options>
+                  ${mobileCarriers
+                    .map(
+                      (carrier) =>
+                        `<button type="button" data-action="select-carrier" data-carrier="${escapeHtml(carrier)}">${escapeHtml(carrier)}</button>`
+                    )
+                    .join("")}
+                </div>
+                <small class="field-error hidden" data-carrier-error>통신사를 선택해주세요.</small>
               </label>
               <label class="field">
                 <span>핸드폰번호</span>
                 <span class="auth-input-wrap">
                   <img class="input-icon-img" src="${loginAssetsPath}/icon-input-user.svg" alt="" aria-hidden="true" />
-                  <input class="input" name="phoneNumber" autocomplete="tel" inputmode="tel" placeholder="01012345678" required />
+                  <input class="input" name="phoneNumber" autocomplete="tel" inputmode="numeric" maxlength="11" placeholder="01012345678" data-digits-only data-max-length="11" required />
                 </span>
               </label>
             `
@@ -1605,7 +1626,7 @@ function renderAuthPanel() {
           <span>사번</span>
           <span class="auth-input-wrap">
             <img class="input-icon-img" src="${loginAssetsPath}/icon-input-user.svg" alt="" aria-hidden="true" />
-            <input class="input" name="employeeNo" autocomplete="username" inputmode="text" placeholder="사번을 입력하세요" value="${
+            <input class="input" name="employeeNo" autocomplete="username" inputmode="${isRegister ? "numeric" : "text"}" ${isRegister ? 'maxlength="8" data-digits-only data-max-length="8"' : ""} placeholder="사번을 입력하세요" value="${
               !isRegister ? escapeHtml(saved.employeeNo) : ""
             }" required />
           </span>
@@ -1676,6 +1697,54 @@ function updatePasswordConfirmState(form, { showError = false } = {}) {
   error.classList.toggle("hidden", !shouldShow);
   confirmInput.setCustomValidity(mismatch ? "비밀번호가 일치하지 않습니다." : "");
   return !mismatch;
+}
+
+function normalizeBirthDateInput(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!/^\d{8}$/.test(digits)) return "";
+
+  const year = Number(digits.slice(0, 4));
+  const month = Number(digits.slice(4, 6));
+  const day = Number(digits.slice(6, 8));
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return "";
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+}
+
+function setFieldError(input, errorElement, message, show) {
+  if (input) input.setCustomValidity(show ? message : "");
+  if (errorElement) {
+    errorElement.textContent = message;
+    errorElement.classList.toggle("hidden", !show);
+  }
+}
+
+function validateRegisterForm(form) {
+  const passwordValid = updatePasswordConfirmState(form, { showError: true });
+  const birthInput = form.elements.birthDate;
+  const birthError = form.querySelector("[data-birth-date-error]");
+  const birthDate = normalizeBirthDateInput(birthInput?.value);
+  const birthValid = Boolean(birthDate);
+  setFieldError(birthInput, birthError, "생년월일 8자리를 입력해주세요.", !birthValid);
+
+  const carrierInput = form.elements.mobileCarrier;
+  const carrierError = form.querySelector("[data-carrier-error]");
+  const carrierValid = Boolean(carrierInput?.value);
+  setFieldError(carrierInput, carrierError, "통신사를 선택해주세요.", !carrierValid);
+
+  const phoneInput = form.elements.phoneNumber;
+  const phoneValid = /^\d{11}$/.test(phoneInput?.value || "");
+  if (phoneInput) phoneInput.setCustomValidity(phoneValid ? "" : "핸드폰번호 11자리를 입력해주세요.");
+
+  const employeeNoInput = form.elements.employeeNo;
+  const employeeNoValid = /^\d{8}$/.test(employeeNoInput?.value || "");
+  if (employeeNoInput) employeeNoInput.setCustomValidity(employeeNoValid ? "" : "사번 8자리를 입력해주세요.");
+
+  const firstInvalid = [birthInput, carrierInput, phoneInput, employeeNoInput, form.elements.passwordConfirm].find(
+    (input) => input && !input.checkValidity()
+  );
+  if (firstInvalid) firstInvalid.focus();
+  return passwordValid && birthValid && carrierValid && phoneValid && employeeNoValid;
 }
 
 function renderHeroAccount() {
@@ -2222,19 +2291,8 @@ document.addEventListener("click", async (event) => {
 
     if (action === "account-tab") {
       state.accountTab = target.dataset.tab || "LIFE";
-      state.accountSearch = "";
-      state.accountSearchOpen = false;
       state.selectedAccountRowKey = "";
       renderInsuranceAccountsPage();
-    }
-
-    if (action === "account-search-toggle") {
-      state.accountSearchOpen = !state.accountSearchOpen;
-      if (!state.accountSearchOpen) state.accountSearch = "";
-      renderInsuranceAccountsPage();
-      if (state.accountSearchOpen) {
-        window.requestAnimationFrame(() => document.querySelector('[data-action="account-search-input"]')?.focus());
-      }
     }
 
     if (action === "select-account-row") {
@@ -2253,6 +2311,27 @@ document.addEventListener("click", async (event) => {
     if (action === "account-cancel") {
       state.accountEditMode = false;
       renderInsuranceAccountsPage();
+    }
+
+    if (action === "toggle-carrier-options") {
+      const field = target.closest(".carrier-field");
+      field?.querySelector("[data-carrier-options]")?.classList.toggle("hidden");
+    }
+
+    if (action === "select-carrier") {
+      const field = target.closest(".carrier-field");
+      const valueInput = field?.querySelector("[data-carrier-value]");
+      const label = field?.querySelector("[data-carrier-label]");
+      const options = field?.querySelector("[data-carrier-options]");
+      const error = field?.querySelector("[data-carrier-error]");
+      const carrier = target.dataset.carrier || "";
+      if (valueInput) {
+        valueInput.value = carrier;
+        valueInput.setCustomValidity("");
+      }
+      if (label) label.textContent = carrier || "통신사를 선택하세요";
+      if (options) options.classList.add("hidden");
+      if (error) error.classList.add("hidden");
     }
 
     if (action === "delete-employee") {
@@ -2304,6 +2383,24 @@ document.addEventListener("change", async (event) => {
 });
 
 document.addEventListener("input", (event) => {
+  if (event.target.dataset.digitsOnly !== undefined) {
+    const maxLength = Number(event.target.dataset.maxLength || event.target.maxLength || 99);
+    event.target.value = event.target.value.replace(/\D/g, "").slice(0, maxLength);
+    event.target.setCustomValidity("");
+
+    const form = event.target.closest('form[data-form="register"]');
+    if (form && event.target.name === "birthDate") {
+      const error = form.querySelector("[data-birth-date-error]");
+      if (error) error.classList.toggle("hidden", event.target.value.length !== 8 || Boolean(normalizeBirthDateInput(event.target.value)));
+    }
+    if (form && event.target.name === "phoneNumber" && event.target.value.length === 11) {
+      form.elements.employeeNo?.focus();
+    }
+    if (form && event.target.name === "employeeNo" && event.target.value.length === 8) {
+      form.elements.password?.focus();
+    }
+  }
+
   if (event.target.dataset.action === "calendar-search-input") {
     state.calendarSearchQuery = event.target.value;
     const results = document.querySelector(".calendar-search-results");
@@ -2348,8 +2445,7 @@ document.addEventListener("submit", async (event) => {
   if (!form) return;
   event.preventDefault();
 
-  if (form.dataset.form === "register" && !updatePasswordConfirmState(form, { showError: true })) {
-    form.elements.passwordConfirm.focus();
+  if (form.dataset.form === "register" && !validateRegisterForm(form)) {
     return;
   }
 
@@ -2440,11 +2536,12 @@ document.addEventListener("submit", async (event) => {
     }
 
     if (form.dataset.form === "register") {
+      const normalizedBirthDate = normalizeBirthDateInput(data.birthDate);
       const result = await callRpc("register_employee", {
         name_input: data.name,
         employee_no_input: data.employeeNo,
         password_input: data.password,
-        birth_date_input: data.birthDate,
+        birth_date_input: normalizedBirthDate,
         mobile_carrier_input: data.mobileCarrier,
         phone_number_input: data.phoneNumber
       });

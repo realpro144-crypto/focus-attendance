@@ -38,7 +38,7 @@ values
   ('LIFE', '메트라이프', 10),
   ('LIFE', '삼성생명', 11),
   ('LIFE', 'ABL생명', 12),
-  ('LIFE', 'BNP PARIBAS', 13),
+  ('LIFE', 'BNP', 13),
   ('LIFE', 'NH농협생명', 14),
   ('LIFE', '신한라이프', 15),
   ('LIFE', 'IBK연금보험', 16),
@@ -63,6 +63,16 @@ values
   ('NONLIFE', 'CHUBB손해보험', 13)
 on conflict (company_type, company_name) do update
 set display_order = excluded.display_order;
+
+update public.insurance_accounts
+set company_name = 'BNP',
+    updated_at = now()
+where company_type = 'LIFE'
+  and company_name = 'BNP PARIBAS';
+
+delete from public.insurance_company_catalog
+where company_type = 'LIFE'
+  and company_name = 'BNP PARIBAS';
 
 create table if not exists public.insurance_accounts (
   id uuid primary key default gen_random_uuid(),
