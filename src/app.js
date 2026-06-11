@@ -557,7 +557,7 @@ function renderInsuranceTableCell(field, company, value) {
     return `<span class="${value ? "" : "empty"}">${escapeHtml(accountDisplayValue(value))}</span>`;
   }
 
-  return `<input class="input insurance-table-input" name="${accountInputName(field, company)}" value="${escapeHtml(value || "")}" placeholder="미입력" autocomplete="off" />`;
+  return `<input class="input insurance-table-input" name="${accountInputName(field, company)}" value="${escapeHtml(value || "")}" placeholder="미입력" autocomplete="off" enterkeyhint="done" />`;
 }
 
 function renderInsuranceTableRow(type, company, { fixed = false } = {}) {
@@ -2312,6 +2312,12 @@ document.addEventListener("focusin", (event) => {
   const field = event.target.closest(".schedule-form input, .schedule-form textarea, .insurance-form input");
   if (!field) return;
   window.setTimeout(() => field.scrollIntoView({ block: "center", behavior: "smooth" }), 120);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (!event.target.matches(".insurance-table-input") || event.key !== "Enter") return;
+  event.preventDefault();
+  event.target.blur();
 });
 
 document.addEventListener("submit", async (event) => {
