@@ -25,6 +25,48 @@ const pastelScheduleColors = [
   "#CBD5E1",
   "#FCA5A5"
 ];
+const insuranceCompanies = {
+  GA: [{ id: "ga-aplus", name: "에이플러스에셋" }],
+  LIFE: [
+    { id: "life-lina", name: "라이나생명" },
+    { id: "life-miraeasset", name: "미래에셋생명" },
+    { id: "life-heungkuk", name: "흥국생명" },
+    { id: "life-db", name: "DB생명" },
+    { id: "life-im", name: "iM라이프" },
+    { id: "life-kdb", name: "KDB생명" },
+    { id: "life-dongyang", name: "동양생명" },
+    { id: "life-prudential", name: "푸르덴셜" },
+    { id: "life-hanwha", name: "한화생명" },
+    { id: "life-metlife", name: "메트라이프" },
+    { id: "life-samsung", name: "삼성생명" },
+    { id: "life-abl", name: "ABL생명" },
+    { id: "life-bnp", name: "BNP PARIBAS" },
+    { id: "life-nh", name: "NH농협생명" },
+    { id: "life-shinhan", name: "신한라이프" },
+    { id: "life-ibk", name: "IBK연금보험" },
+    { id: "life-kb", name: "KB생명보험" },
+    { id: "life-chubb", name: "CHUBB" },
+    { id: "life-kyobo", name: "교보생명" },
+    { id: "life-fubon", name: "푸본현대생명" },
+    { id: "life-hana", name: "하나생명" },
+    { id: "life-aia", name: "AIA생명" }
+  ],
+  NONLIFE: [
+    { id: "nonlife-meritz", name: "메리츠화재" },
+    { id: "nonlife-hyundai", name: "현대해상" },
+    { id: "nonlife-db", name: "DB손해보험" },
+    { id: "nonlife-samsung", name: "삼성화재" },
+    { id: "nonlife-lotte", name: "롯데손해보험" },
+    { id: "nonlife-kb", name: "KB손해보험" },
+    { id: "nonlife-hanwha", name: "한화손해보험" },
+    { id: "nonlife-nh", name: "NH농협손해보험" },
+    { id: "nonlife-mg", name: "MG손해보험" },
+    { id: "nonlife-hana", name: "하나손해보험" },
+    { id: "nonlife-heungkuk", name: "흥국화재" },
+    { id: "nonlife-aig", name: "AIG손해보험" },
+    { id: "nonlife-chubb", name: "CHUBB손해보험" }
+  ]
+};
 
 let app = null;
 let supabase = null;
@@ -39,6 +81,9 @@ let state = {
   employees: [],
   records: [],
   schedules: [],
+  insuranceAccounts: [],
+  insuranceCanManageAll: false,
+  insuranceAccountError: "",
   today: null,
   checkInUrl: "",
   wallQrUrl: "",
@@ -57,6 +102,10 @@ let state = {
   scheduleNoticeOn: false,
   calendarSearchOpen: false,
   calendarSearchQuery: "",
+  accountTab: "LIFE",
+  accountSearch: "",
+  accountEditMode: false,
+  accountEmployeeId: "",
   authMode: "login",
   auth: { status: "checking", token: "", employee: null },
   savedLogin: { employeeNo: "", password: "", rememberCredentials: false, autoLogin: false },
@@ -87,11 +136,13 @@ export function startApp(rootElement) {
 
 const route = () => {
   if (window.location.pathname === "/calendar") return "calendar";
+  if (window.location.pathname === "/accounts") return "accounts";
   if (window.location.pathname === "/checkin") return "checkin";
   return "dashboard";
 };
 const isCheckinRoute = () => route() === "checkin";
-const isEmployeeRoute = () => ["checkin", "calendar"].includes(route());
+const isAccountsRoute = () => route() === "accounts";
+const isEmployeeRoute = () => ["checkin", "calendar", "accounts"].includes(route());
 const isAdminRoute = () => route() === "dashboard";
 
 const escapeHtml = (value) =>
@@ -429,6 +480,198 @@ function defaultScheduleScopeValue() {
   return state.auth.employee?.id || "";
 }
 
+function selectedAccountOwnerId() {
+  return state.accountEmployeeId || defaultAccountEmployeeId();
+}
+
+function selectedAccountOwner() {
+  const ownerId = selectedAccountOwnerId();
+  return state.employees.find((employee) => employee.id === ownerId) || state.auth.employee;
+}
+
+function accountLookup(type, companyName, ownerId = selectedAccountOwnerId()) {
+  return (state.insuranceAccounts || []).find(
+    (account) =>
+      account.ownerUserId === ownerId &&
+      account.companyType === type &&
+      account.companyName === companyName
+  );
+}
+
+function accountDisplayValue(value) {
+  const text = String(value || "").trim();
+  return text || "미입력";
+}
+
+function accountInputName(field, company) {
+  return `${field}__${company.id}`;
+}
+
+function currentInsuranceCompanies() {
+  const query = state.accountSearch.trim().toLowerCase();
+  return insuranceCompanies[state.accountTab].filter((company) =>
+    company.name.toLowerCase().includes(query)
+  );
+}
+
+function renderAccountValue(label, value) {
+  return `
+    <div class="insurance-value">
+      <span>${label}</span>
+      <strong class="${value ? "" : "empty"}">${escapeHtml(accountDisplayValue(value))}</strong>
+    </div>
+  `;
+}
+
+function renderAccountInput(label, field, company, value) {
+  return `
+    <label class="insurance-input-field">
+      <span>${label}</span>
+      <input class="input" name="${accountInputName(field, company)}" value="${escapeHtml(value || "")}" placeholder="미입력" autocomplete="off" />
+    </label>
+  `;
+}
+
+function renderInsuranceAccountCard(type, company, { fixed = false } = {}) {
+  const account = accountLookup(type, company.name);
+  const employeeNumber = account?.employeeNumber || "";
+  const password = account?.password || "";
+  const extraAuth = account?.extraAuth || "";
+
+  return `
+    <article class="insurance-account-card ${fixed ? "ga-fixed-card" : ""}">
+      <header>
+        <div>
+          <span>${type === "GA" ? "GA" : type === "LIFE" ? "생명보험" : "손해보험"}</span>
+          <h3>${escapeHtml(company.name)}</h3>
+        </div>
+      </header>
+      <div class="insurance-card-fields ${state.accountEditMode ? "editing" : ""}">
+        ${
+          state.accountEditMode
+            ? `
+              ${renderAccountInput("사번", "employeeNumber", company, employeeNumber)}
+              ${renderAccountInput("비밀번호", "password", company, password)}
+              ${renderAccountInput("기타인증", "extraAuth", company, extraAuth)}
+            `
+            : `
+              ${renderAccountValue("사번", employeeNumber)}
+              ${renderAccountValue("비밀번호", password)}
+              ${renderAccountValue("기타인증", extraAuth)}
+            `
+        }
+      </div>
+    </article>
+  `;
+}
+
+function renderInsuranceAccountContent() {
+  const companies = currentInsuranceCompanies();
+  return `
+    <section class="ga-card-section">
+      ${renderInsuranceAccountCard("GA", insuranceCompanies.GA[0], { fixed: true })}
+    </section>
+    <section class="insurance-list-section">
+      <div class="insurance-list-title">
+        <h2>${state.accountTab === "LIFE" ? "생명보험" : "손해보험"}</h2>
+        <span>${companies.length}개</span>
+      </div>
+      <div class="insurance-account-list">
+        ${
+          companies.length
+            ? companies.map((company) => renderInsuranceAccountCard(state.accountTab, company)).join("")
+            : `<div class="sheet-empty">검색 결과가 없습니다.</div>`
+        }
+      </div>
+    </section>
+  `;
+}
+
+function renderInsuranceEmployeeSelector() {
+  if (!canManageInsuranceAccounts()) return "";
+
+  return `
+    <label class="insurance-employee-select">
+      <span>조회 지점원</span>
+      <select class="select" data-action="account-employee">
+        ${state.employees
+          .map(
+            (employee) =>
+              `<option value="${employee.id}"${selectedAccountOwnerId() === employee.id ? " selected" : ""}>${escapeHtml(employee.name)} (${escapeHtml(employeeNoLabel(employee.employeeNo))})</option>`
+          )
+          .join("")}
+      </select>
+    </label>
+  `;
+}
+
+function renderInsuranceAccountsPage() {
+  const owner = selectedAccountOwner();
+  const content = `
+    <header class="insurance-page-header">
+      <button class="insurance-back-btn" type="button" data-action="go-home">홈</button>
+      <div>
+        <h1>사번/비밀번호</h1>
+        <p>${escapeHtml(owner?.name || "지점원")} 계정 정보</p>
+      </div>
+      ${
+        state.accountEditMode
+          ? `<button class="insurance-edit-btn" type="button" data-action="account-cancel">취소</button>`
+          : `<button class="insurance-edit-btn" type="button" data-action="account-edit">수정</button>`
+      }
+    </header>
+    ${
+      state.insuranceAccountError
+        ? `
+          <div class="insurance-error-box">
+            <strong>설정이 필요합니다.</strong>
+            <p>${escapeHtml(state.insuranceAccountError)}</p>
+          </div>
+        `
+        : `
+          <div class="insurance-controls">
+            ${renderInsuranceEmployeeSelector()}
+            <label class="insurance-search">
+              <span>회사명 검색</span>
+              <input class="input" data-action="account-search-input" value="${escapeHtml(state.accountSearch)}" placeholder="예: 삼성" ${state.accountEditMode ? "disabled" : ""} />
+            </label>
+            <div class="insurance-tabs" role="tablist" aria-label="보험사 구분">
+              <button type="button" class="${state.accountTab === "LIFE" ? "active" : ""}" data-action="account-tab" data-tab="LIFE">생명보험</button>
+              <button type="button" class="${state.accountTab === "NONLIFE" ? "active" : ""}" data-action="account-tab" data-tab="NONLIFE">손해보험</button>
+            </div>
+          </div>
+          <div class="insurance-account-content">
+            ${renderInsuranceAccountContent()}
+          </div>
+          ${
+            state.accountEditMode
+              ? `
+                <div class="insurance-save-bar">
+                  <button class="btn secondary" type="button" data-action="account-cancel">취소</button>
+                  <button class="btn primary" type="submit">저장</button>
+                </div>
+              `
+              : ""
+          }
+        `
+    }
+  `;
+
+  app.innerHTML = `
+    <div class="insurance-page">
+      <main class="insurance-shell">
+        ${
+          state.auth.employee
+            ? state.accountEditMode
+              ? `<form class="insurance-form" data-form="insurance-accounts">${content}</form>`
+              : content
+            : renderAuthPanel()
+        }
+      </main>
+    </div>
+  `;
+}
+
 function captureScheduleDraft() {
   const form = document.querySelector('[data-form="schedule"]');
   if (!form) return null;
@@ -507,6 +750,44 @@ async function callRpc(name, args = {}) {
   return data;
 }
 
+function canManageInsuranceAccounts() {
+  return Boolean(state.insuranceCanManageAll || state.auth.employee?.isAdmin || state.auth.employee?.isSecretary);
+}
+
+function defaultAccountEmployeeId(employees = state.employees) {
+  if (canManageInsuranceAccounts()) {
+    if (state.accountEmployeeId && employees.some((employee) => employee.id === state.accountEmployeeId)) {
+      return state.accountEmployeeId;
+    }
+    return employees[0]?.id || state.auth.employee?.id || "";
+  }
+  return state.auth.employee?.id || "";
+}
+
+async function loadInsuranceAccountState() {
+  if (!state.auth.employee) return;
+
+  try {
+    const payload = await callRpc("get_insurance_account_state", {
+      session_token_input: state.auth.token
+    });
+    const employees = payload.employees ?? state.employees ?? [];
+    state = {
+      ...state,
+      employees,
+      insuranceAccounts: payload.insuranceAccounts ?? [],
+      insuranceCanManageAll: Boolean(payload.canManageAllAccounts),
+      insuranceAccountError: ""
+    };
+    state.accountEmployeeId = defaultAccountEmployeeId(employees);
+  } catch (error) {
+    state.insuranceAccountError = `사번/비밀번호 기능 SQL을 Supabase에 먼저 적용해 주세요. ${error.message}`;
+    state.insuranceAccounts = [];
+    state.insuranceCanManageAll = false;
+    state.accountEmployeeId = state.auth.employee?.id || "";
+  }
+}
+
 async function loadState({ keepCheckIn = false } = {}) {
   let payload;
   if (isEmployeeRoute()) {
@@ -577,6 +858,10 @@ async function loadState({ keepCheckIn = false } = {}) {
     qrDataUrl,
     ...checkInFields
   };
+
+  if (isAccountsRoute() && state.auth.employee) {
+    await loadInsuranceAccountState();
+  }
 }
 
 async function loadAuth() {
@@ -628,11 +913,17 @@ function clearSession() {
   state.scannerStatus = "idle";
   state.scannerError = "";
   state.schedules = [];
+  state.insuranceAccounts = [];
+  state.insuranceCanManageAll = false;
+  state.insuranceAccountError = "";
   state.daySheetOpen = false;
   state.scheduleEditorMode = "";
   state.selectedScheduleId = "";
   state.calendarSearchOpen = false;
   state.calendarSearchQuery = "";
+  state.accountSearch = "";
+  state.accountEditMode = false;
+  state.accountEmployeeId = "";
 }
 
 function renderTopbar() {
@@ -641,6 +932,7 @@ function renderTopbar() {
     ? `
       <button class="btn secondary" data-action="refresh">새로고침</button>
       <button class="btn secondary" data-action="go-home">출근 화면</button>
+      <button class="btn secondary" data-action="open-accounts">사번/비밀번호</button>
       <button class="btn secondary" data-action="logout">로그아웃</button>
     `
     : isCheckinRoute()
@@ -1347,8 +1639,9 @@ function renderCheckinActions() {
   return `
     <div class="checkin-bottom-actions">
       ${isAdminEmployee() ? `<button class="btn secondary wide" data-action="open-admin">관리자 페이지</button>` : ""}
-      <button class="btn secondary wide" data-action="open-calendar">캘린더 보기</button>
-      <button class="btn secondary wide" data-action="logout">로그아웃</button>
+      <button class="btn secondary wide" data-action="open-calendar">캘린더</button>
+      <button class="btn secondary wide" data-action="open-accounts">사번/비밀번호</button>
+      <button class="logout-link" data-action="logout">로그아웃</button>
     </div>
   `;
 }
@@ -1455,6 +1748,7 @@ function renderEmployeeCalendarPage() {
 
 function render() {
   if (route() === "calendar") renderEmployeeCalendarPage();
+  else if (route() === "accounts") renderInsuranceAccountsPage();
   else if (route() === "checkin") renderCheckin();
   else renderDashboard();
 }
@@ -1818,7 +2112,7 @@ document.addEventListener("click", async (event) => {
     if (action === "logout") {
       await stopScanner({ rerender: false });
       clearSession();
-      if (route() === "calendar" || route() === "dashboard") window.history.pushState({}, "", "/checkin");
+      if (route() === "calendar" || route() === "dashboard" || route() === "accounts") window.history.pushState({}, "", "/checkin");
       render();
     }
 
@@ -1826,6 +2120,14 @@ document.addEventListener("click", async (event) => {
       window.history.pushState({}, "", "/calendar");
       await loadState({ keepCheckIn: true });
       renderEmployeeCalendarPage();
+    }
+
+    if (action === "open-accounts") {
+      window.history.pushState({}, "", "/accounts");
+      state.accountEditMode = false;
+      state.accountSearch = "";
+      await loadState({ keepCheckIn: true });
+      renderInsuranceAccountsPage();
     }
 
     if (action === "open-admin") {
@@ -1837,6 +2139,23 @@ document.addEventListener("click", async (event) => {
     if (action === "go-home") {
       window.history.pushState({}, "", "/checkin");
       renderCheckin();
+    }
+
+    if (action === "account-tab") {
+      state.accountTab = target.dataset.tab || "LIFE";
+      state.accountSearch = "";
+      renderInsuranceAccountsPage();
+    }
+
+    if (action === "account-edit") {
+      state.accountEditMode = true;
+      state.accountSearch = "";
+      renderInsuranceAccountsPage();
+    }
+
+    if (action === "account-cancel") {
+      state.accountEditMode = false;
+      renderInsuranceAccountsPage();
     }
 
     if (action === "delete-employee") {
@@ -1876,6 +2195,13 @@ document.addEventListener("change", async (event) => {
     renderDashboard();
   }
 
+  if (event.target.dataset.action === "account-employee") {
+    state.accountEmployeeId = event.target.value;
+    state.accountEditMode = false;
+    state.accountSearch = "";
+    renderInsuranceAccountsPage();
+  }
+
 });
 
 document.addEventListener("input", (event) => {
@@ -1883,6 +2209,13 @@ document.addEventListener("input", (event) => {
     state.calendarSearchQuery = event.target.value;
     const results = document.querySelector(".calendar-search-results");
     if (results) results.innerHTML = renderCalendarSearchResults();
+    return;
+  }
+
+  if (event.target.dataset.action === "account-search-input") {
+    state.accountSearch = event.target.value;
+    const content = document.querySelector(".insurance-account-content");
+    if (content) content.innerHTML = renderInsuranceAccountContent();
     return;
   }
 
@@ -1900,7 +2233,7 @@ document.addEventListener("input", (event) => {
 });
 
 document.addEventListener("focusin", (event) => {
-  const field = event.target.closest(".schedule-form input, .schedule-form textarea");
+  const field = event.target.closest(".schedule-form input, .schedule-form textarea, .insurance-form input");
   if (!field) return;
   window.setTimeout(() => field.scrollIntoView({ block: "center", behavior: "smooth" }), 120);
 });
@@ -1976,6 +2309,31 @@ document.addEventListener("submit", async (event) => {
       showToast("일정이 저장되었습니다");
     }
 
+    if (form.dataset.form === "insurance-accounts") {
+      const ownerId = selectedAccountOwnerId();
+      const companiesToSave = [
+        { type: "GA", company: insuranceCompanies.GA[0] },
+        ...insuranceCompanies[state.accountTab].map((company) => ({ type: state.accountTab, company }))
+      ];
+      const accounts = companiesToSave.map(({ type, company }) => ({
+        companyType: type,
+        companyName: company.name,
+        employeeNumber: data[accountInputName("employeeNumber", company)] || "",
+        password: data[accountInputName("password", company)] || "",
+        extraAuth: data[accountInputName("extraAuth", company)] || ""
+      }));
+
+      await callRpc("upsert_insurance_accounts", {
+        session_token_input: state.auth.token,
+        owner_user_id_input: ownerId,
+        accounts_input: accounts
+      });
+      state.accountEditMode = false;
+      await loadInsuranceAccountState();
+      renderInsuranceAccountsPage();
+      showToast("계정 정보가 저장되었습니다");
+    }
+
     if (form.dataset.form === "register") {
       const result = await callRpc("register_employee", {
         name_input: data.name,
@@ -1984,7 +2342,7 @@ document.addEventListener("submit", async (event) => {
       });
       saveSession(result.token, result.employee);
       await loadState({ keepCheckIn: true });
-      renderCheckin();
+      render();
       await maybeCompleteCheckIn();
       showToast("지점원 등록이 완료되었습니다.");
     }
@@ -2004,7 +2362,7 @@ document.addEventListener("submit", async (event) => {
       });
       saveSession(result.token, result.employee, { persist: autoLogin });
       await loadState({ keepCheckIn: true });
-      renderCheckin();
+      render();
       await maybeCompleteCheckIn();
       showToast("로그인되었습니다.");
     }

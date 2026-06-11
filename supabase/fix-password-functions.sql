@@ -36,7 +36,12 @@ begin
   if length(clean_password) < 4 then
     raise exception '비밀번호는 4자 이상 입력해 주세요.';
   end if;
-  if exists (select 1 from public.employees where employee_no = clean_no) then
+  update public.employees
+  set employee_no = employee_no || '_DELETED_' || replace(id::text, '-', '')
+  where employee_no = clean_no
+    and active = false;
+
+  if exists (select 1 from public.employees where employee_no = clean_no and active = true) then
     raise exception '이미 등록된 사번입니다. 로그인해 주세요.';
   end if;
   insert into public.employees (name, employee_no, password_hash, is_admin)
