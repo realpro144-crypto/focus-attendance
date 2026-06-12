@@ -2482,7 +2482,7 @@ document.addEventListener("click", async (event) => {
       renderTaskRequestPage();
     }
 
-    if (action === "task-company-select") {
+    if (action === "task-select-company") {
       const type = target.dataset.companyType || state.taskCompanyTab;
       const company = taskCompanyById(type, target.dataset.companyId);
       if (!company) return;
