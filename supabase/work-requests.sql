@@ -38,8 +38,15 @@ create table if not exists public.work_requests (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint work_requests_type_check check (request_type in ('CUSTOMER_REGISTRATION', 'ENDORSEMENT')),
-  constraint work_requests_status_check check (status in ('WAITING', 'ASSIGNED', 'COMPLETED'))
+  constraint work_requests_status_check check (status in ('WAITING', 'ASSIGNED', 'RETURNED', 'COMPLETED'))
 );
+
+alter table public.work_requests
+drop constraint if exists work_requests_status_check;
+
+alter table public.work_requests
+add constraint work_requests_status_check
+check (status in ('WAITING', 'ASSIGNED', 'RETURNED', 'COMPLETED'));
 
 create index if not exists work_requests_requester_idx
 on public.work_requests(requester_user_id, created_at desc);
@@ -258,6 +265,116 @@ begin
 end;
 $$;
 
+create or replace function public.update_work_request(
+  session_token_input text,
+  request_id_input uuid,
+  company_name_input text,
+  customer_name_input text,
+  rrn_front_input text,
+  rrn_back_input text,
+  phone1_input text,
+  phone2_input text,
+  phone3_input text,
+  address_input text,
+  address_detail_input text,
+  job_input text,
+  driving_type_input text,
+  memo_input text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor_row public.employees;
+  request_row public.work_requests;
+  clean_company text := left(trim(coalesce(company_name_input, '')), 120);
+  clean_customer text := left(regexp_replace(trim(coalesce(customer_name_input, '')), '\s+', ' ', 'g'), 80);
+  clean_rrn_front text := regexp_replace(trim(coalesce(rrn_front_input, '')), '\D', '', 'g');
+  clean_rrn_back text := regexp_replace(trim(coalesce(rrn_back_input, '')), '\D', '', 'g');
+  clean_phone1 text := regexp_replace(trim(coalesce(phone1_input, '')), '\D', '', 'g');
+  clean_phone2 text := regexp_replace(trim(coalesce(phone2_input, '')), '\D', '', 'g');
+  clean_phone3 text := regexp_replace(trim(coalesce(phone3_input, '')), '\D', '', 'g');
+  actor_can_handle boolean;
+  actor_is_owner boolean;
+  next_status text;
+  next_secretary_id uuid;
+  next_secretary_name text;
+  next_secretary_phone text;
+begin
+  actor_row := public.require_work_request_actor(session_token_input);
+  actor_can_handle := coalesce(actor_row.is_secretary, false);
+
+  select * into request_row
+  from public.work_requests
+  where id = request_id_input
+  for update;
+
+  if request_row.id is null then
+    raise exception '업무요청을 찾을 수 없습니다.';
+  end if;
+
+  actor_is_owner := request_row.requester_user_id = actor_row.id;
+
+  if request_row.status = 'COMPLETED' then
+    raise exception '완료된 업무요청은 수정할 수 없습니다.';
+  end if;
+
+  if actor_can_handle is not true and actor_is_owner is not true then
+    raise exception '수정 권한이 없습니다.';
+  end if;
+
+  if actor_can_handle is not true and request_row.status not in ('WAITING', 'RETURNED') then
+    raise exception '접수 전 또는 반송된 업무만 수정할 수 있습니다.';
+  end if;
+
+  if clean_customer = '' then
+    raise exception '고객명을 입력해 주세요.';
+  end if;
+
+  if clean_company = '' then
+    raise exception '등록회사명을 입력해 주세요.';
+  end if;
+
+  next_status := request_row.status;
+  next_secretary_id := request_row.assigned_secretary_id;
+  next_secretary_name := request_row.assigned_secretary_name;
+  next_secretary_phone := request_row.assigned_secretary_phone;
+
+  if actor_is_owner and request_row.status = 'RETURNED' then
+    next_status := 'WAITING';
+    next_secretary_id := null;
+    next_secretary_name := null;
+    next_secretary_phone := null;
+  end if;
+
+  update public.work_requests
+  set
+    company_name = clean_company,
+    customer_name = clean_customer,
+    rrn_front = left(clean_rrn_front, 6),
+    rrn_back = left(clean_rrn_back, 7),
+    phone1 = left(clean_phone1, 3),
+    phone2 = left(clean_phone2, 4),
+    phone3 = left(clean_phone3, 4),
+    address = left(trim(coalesce(address_input, '')), 300),
+    address_detail = left(trim(coalesce(address_detail_input, '')), 200),
+    job = left(trim(coalesce(job_input, '')), 120),
+    driving_type = left(trim(coalesce(driving_type_input, '')), 80),
+    memo = left(trim(coalesce(memo_input, '')), 1000),
+    status = next_status,
+    assigned_secretary_id = next_secretary_id,
+    assigned_secretary_name = next_secretary_name,
+    assigned_secretary_phone = next_secretary_phone,
+    updated_at = now()
+  where id = request_row.id
+  returning * into request_row;
+
+  return public.work_request_to_json(request_row);
+end;
+$$;
+
 create or replace function public.assign_work_request(
   session_token_input text,
   request_id_input uuid
@@ -347,6 +464,56 @@ begin
 end;
 $$;
 
+create or replace function public.return_work_request(
+  session_token_input text,
+  request_id_input uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor_row public.employees;
+  request_row public.work_requests;
+begin
+  actor_row := public.require_work_request_actor(session_token_input);
+
+  if coalesce(actor_row.is_secretary, false) is not true then
+    raise exception '비서 권한이 필요합니다.';
+  end if;
+
+  select * into request_row
+  from public.work_requests
+  where id = request_id_input
+  for update;
+
+  if request_row.id is null then
+    raise exception '업무요청을 찾을 수 없습니다.';
+  end if;
+
+  if request_row.status = 'COMPLETED' then
+    raise exception '완료된 업무요청은 반송할 수 없습니다.';
+  end if;
+
+  if request_row.status = 'ASSIGNED' and request_row.assigned_secretary_id is distinct from actor_row.id then
+    raise exception '본인이 접수한 업무요청만 반송할 수 있습니다.';
+  end if;
+
+  update public.work_requests
+  set
+    status = 'RETURNED',
+    assigned_secretary_id = actor_row.id,
+    assigned_secretary_name = actor_row.name,
+    assigned_secretary_phone = actor_row.phone_number,
+    updated_at = now()
+  where id = request_row.id
+  returning * into request_row;
+
+  return public.work_request_to_json(request_row);
+end;
+$$;
+
 create or replace function public.set_employee_role(
   session_token_input text,
   employee_id_input uuid,
@@ -404,6 +571,8 @@ revoke execute on function public.work_request_to_json(public.work_requests) fro
 
 grant execute on function public.get_work_request_state(text) to anon, authenticated;
 grant execute on function public.create_work_request(text, text, text, text, text, text, text, text, text, text, text, text, text, text) to anon, authenticated;
+grant execute on function public.update_work_request(text, uuid, text, text, text, text, text, text, text, text, text, text, text, text) to anon, authenticated;
 grant execute on function public.assign_work_request(text, uuid) to anon, authenticated;
 grant execute on function public.complete_work_request(text, uuid) to anon, authenticated;
+grant execute on function public.return_work_request(text, uuid) to anon, authenticated;
 grant execute on function public.set_employee_role(text, uuid, text) to anon, authenticated;

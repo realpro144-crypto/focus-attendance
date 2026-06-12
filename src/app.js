@@ -115,6 +115,7 @@ let state = {
   taskView: "home",
   taskCompanyTab: "LIFE",
   taskSelectedCompany: null,
+  selectedWorkRequestId: "",
   authMode: "login",
   auth: { status: "checking", token: "", employee: null },
   savedLogin: { employeeNo: "", password: "", rememberCredentials: false, autoLogin: false },
@@ -570,6 +571,7 @@ function workRequestStatusLabel(status) {
   const labels = {
     WAITING: "대기",
     ASSIGNED: "접수",
+    RETURNED: "반송",
     COMPLETED: "완료"
   };
   return labels[status] || status || "대기";
@@ -587,6 +589,30 @@ function employeeRoleValue(employee) {
   if (employee?.isAdmin) return "admin";
   if (employee?.isSecretary) return "secretary";
   return "member";
+}
+
+function selectedWorkRequest() {
+  return (state.workRequests || []).find((request) => request.id === state.selectedWorkRequestId) || null;
+}
+
+function canEditWorkRequest(request) {
+  if (!request || !state.auth.employee) return false;
+  if (canHandleWorkRequests() && request.status !== "COMPLETED") return true;
+  return request.requesterUserId === state.auth.employee.id && ["WAITING", "RETURNED"].includes(request.status);
+}
+
+function formatRequestDate(value) {
+  if (!value) return "";
+  try {
+    return new Intl.DateTimeFormat("ko-KR", {
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date(value));
+  } catch {
+    return String(value);
+  }
 }
 
 function insuranceCompanyNameHtml(name) {
@@ -790,14 +816,12 @@ function taskCompanyById(type, id) {
 function renderWorkRequestCard(request) {
   const isManager = canManageWorkRequests();
   const assigned = request.assignedSecretaryName || request.assignedSecretaryPhone;
-  const canAssign = canHandleWorkRequests() && request.status === "WAITING";
-  const canComplete = canHandleWorkRequests() && request.status === "ASSIGNED" && request.assignedSecretaryId === state.auth.employee?.id;
 
   return `
-    <article class="work-request-card status-${escapeHtml(request.status || "WAITING").toLowerCase()}">
+    <article class="work-request-card status-${escapeHtml(request.status || "WAITING").toLowerCase()}" data-action="task-open-request" data-request-id="${escapeHtml(request.id)}">
       <div class="work-request-head">
         <div>
-          <span class="work-request-type">${escapeHtml(workRequestTypeLabel(request.requestType))}</span>
+          <span class="work-request-type">업무구분 · ${escapeHtml(workRequestTypeLabel(request.requestType))}</span>
           <strong>${escapeHtml(request.customerName || "고객명 없음")}</strong>
         </div>
         <span class="work-status">${escapeHtml(workRequestStatusLabel(request.status))}</span>
@@ -810,16 +834,6 @@ function renderWorkRequestCard(request) {
         ${assigned ? `<div><dt>담당 비서</dt><dd>${escapeHtml(request.assignedSecretaryName || "-")} ${request.assignedSecretaryPhone ? `· ${escapeHtml(request.assignedSecretaryPhone)}` : ""}</dd></div>` : ""}
       </dl>
       ${request.memo ? `<p class="work-request-memo">${escapeHtml(request.memo)}</p>` : ""}
-      ${
-        canAssign || canComplete
-          ? `
-            <div class="work-request-actions">
-              ${canAssign ? `<button class="btn primary" type="button" data-action="task-assign-request" data-request-id="${escapeHtml(request.id)}">접수하기</button>` : ""}
-              ${canComplete ? `<button class="btn secondary" type="button" data-action="task-complete-request" data-request-id="${escapeHtml(request.id)}">완료하기</button>` : ""}
-            </div>
-          `
-          : ""
-      }
     </article>
   `;
 }
@@ -864,18 +878,25 @@ function renderTaskHeader(title, subtitle = "", backAction = "go-home", backLabe
 }
 
 function renderTaskHome() {
+  const showRequestActions = !canManageWorkRequests() || isAdminEmployee();
   return `
-    ${renderTaskHeader("업무요청", "필요한 업무를 선택하세요")}
-    <section class="task-card-grid">
-      <button class="task-menu-card" type="button" data-action="task-open-customer">
-        <strong>고객등록</strong>
-        <span>보험회사 선택 후 고객 정보를 입력합니다.</span>
-      </button>
-      <button class="task-menu-card" type="button" data-action="task-open-endorsement">
-        <strong>배서요청</strong>
-        <span>배서요청 화면은 준비 중입니다.</span>
-      </button>
-    </section>
+    ${renderTaskHeader("업무요청", canManageWorkRequests() ? "지점원이 요청한 업무를 확인하세요" : "필요한 업무를 선택하세요")}
+    ${
+      showRequestActions
+        ? `
+          <section class="task-card-grid">
+            <button class="task-menu-card" type="button" data-action="task-open-customer">
+              <strong>고객등록</strong>
+              <span>보험회사 선택 후 고객 정보를 입력합니다.</span>
+            </button>
+            <button class="task-menu-card" type="button" data-action="task-open-endorsement">
+              <strong>배서요청</strong>
+              <span>배서요청 화면은 준비 중입니다.</span>
+            </button>
+          </section>
+        `
+        : ""
+    }
     ${renderWorkRequestList()}
   `;
 }
@@ -902,69 +923,130 @@ function renderTaskCompanySelect() {
   `;
 }
 
-function renderTaskCustomerForm() {
+function taskRequestFormValue(request, key, fallback = "") {
+  return request ? request[key] || "" : fallback;
+}
+
+function renderTaskCustomerForm(request = null) {
+  const editing = Boolean(request);
   const selected = state.taskSelectedCompany || { type: state.taskCompanyTab, company: insuranceCompanies[state.taskCompanyTab][0] };
-  const companyName = selected.company?.name || "";
+  const companyName = editing ? request.companyName || "" : selected.company?.name || "";
+  const drivingValue = taskRequestFormValue(request, "drivingType", "운전안함");
   return `
-    ${renderTaskHeader("고객등록", companyName, "task-open-customer", "뒤로")}
-    <form class="task-form" data-form="work-request">
+    ${renderTaskHeader(editing ? "업무수정" : "고객등록", companyName, editing ? "task-open-request" : "task-open-customer", "뒤로")}
+    <form class="task-form" data-form="work-request" data-request-id="${escapeHtml(request?.id || "")}">
       <label class="task-field">
         <span>등록회사명</span>
-        <input class="input" name="companyName" value="${escapeHtml(companyName)}" readonly />
+        <input class="input" name="companyName" value="${escapeHtml(companyName)}" ${editing ? "" : "readonly"} required />
       </label>
       <label class="task-field">
         <span>고객명</span>
-        <input class="input" name="customerName" autocomplete="off" placeholder="고객명을 입력하세요" required />
+        <input class="input" name="customerName" autocomplete="off" placeholder="고객명을 입력하세요" value="${escapeHtml(taskRequestFormValue(request, "customerName"))}" required />
       </label>
       <fieldset class="task-fieldset">
         <legend>주민등록번호</legend>
         <div class="task-split id-split">
-          <input class="input" name="residentFront" inputmode="numeric" maxlength="6" minlength="6" pattern="\\d{6}" data-digits-only data-max-length="6" data-focus-next="residentBack" placeholder="앞 6자리" required />
+          <input class="input" name="residentFront" inputmode="numeric" maxlength="6" minlength="6" pattern="\\d{6}" data-digits-only data-max-length="6" data-focus-next="residentBack" placeholder="앞 6자리" value="${escapeHtml(taskRequestFormValue(request, "rrnFront"))}" required />
           <span>-</span>
-          <input class="input" name="residentBack" inputmode="numeric" maxlength="7" minlength="7" pattern="\\d{7}" data-digits-only data-max-length="7" placeholder="뒤 7자리" required />
+          <input class="input" name="residentBack" inputmode="numeric" maxlength="7" minlength="7" pattern="\\d{7}" data-digits-only data-max-length="7" placeholder="뒤 7자리" value="${escapeHtml(taskRequestFormValue(request, "rrnBack"))}" required />
         </div>
       </fieldset>
       <fieldset class="task-fieldset">
         <legend>연락처</legend>
         <div class="task-split phone-split">
-          <input class="input" name="phoneFirst" inputmode="numeric" maxlength="3" value="010" data-digits-only data-max-length="3" data-focus-next="phoneMiddle" />
+          <input class="input" name="phoneFirst" inputmode="numeric" maxlength="3" value="${escapeHtml(taskRequestFormValue(request, "phone1", "010"))}" data-digits-only data-max-length="3" data-focus-next="phoneMiddle" />
           <span>-</span>
-          <input class="input" name="phoneMiddle" inputmode="numeric" maxlength="4" data-digits-only data-max-length="4" data-focus-next="phoneLast" placeholder="0000" />
+          <input class="input" name="phoneMiddle" inputmode="numeric" maxlength="4" data-digits-only data-max-length="4" data-focus-next="phoneLast" placeholder="0000" value="${escapeHtml(taskRequestFormValue(request, "phone2"))}" />
           <span>-</span>
-          <input class="input" name="phoneLast" inputmode="numeric" maxlength="4" data-digits-only data-max-length="4" placeholder="0000" />
+          <input class="input" name="phoneLast" inputmode="numeric" maxlength="4" data-digits-only data-max-length="4" placeholder="0000" value="${escapeHtml(taskRequestFormValue(request, "phone3"))}" />
         </div>
       </fieldset>
       <label class="task-field address-field">
         <span>주소</span>
         <div>
-          <input class="input" name="address" autocomplete="off" placeholder="주소를 입력하세요" />
+          <input class="input" name="address" autocomplete="off" placeholder="주소를 입력하세요" value="${escapeHtml(taskRequestFormValue(request, "address"))}" />
           <button class="btn secondary" type="button" data-action="task-address-search">주소검색</button>
         </div>
       </label>
       <label class="task-field">
         <span>상세주소</span>
-        <input class="input" name="addressDetail" autocomplete="off" placeholder="상세주소를 입력하세요" />
+        <input class="input" name="addressDetail" autocomplete="off" placeholder="상세주소를 입력하세요" value="${escapeHtml(taskRequestFormValue(request, "addressDetail"))}" />
       </label>
       <label class="task-field">
         <span>직업</span>
-        <input class="input" name="job" autocomplete="off" placeholder="직업을 입력하세요" />
+        <input class="input" name="job" autocomplete="off" placeholder="직업을 입력하세요" value="${escapeHtml(taskRequestFormValue(request, "job"))}" />
       </label>
       <label class="task-field">
         <span>운전여부</span>
         <select class="select" name="driving">
-          <option>운전안함</option>
-          <option>승용차(자가용)</option>
-          <option>승용차(영업용)</option>
-          <option>화물차(개인용)</option>
-          <option>화물차(영업용)</option>
+          ${["운전안함", "승용차(자가용)", "승용차(영업용)", "화물차(개인용)", "화물차(영업용)"]
+            .map((option) => `<option${drivingValue === option ? " selected" : ""}>${option}</option>`)
+            .join("")}
         </select>
       </label>
       <label class="task-field">
         <span>메모</span>
-        <textarea class="input" name="memo" rows="4" placeholder="메모를 입력하세요"></textarea>
+        <textarea class="input" name="memo" rows="4" placeholder="메모를 입력하세요">${escapeHtml(taskRequestFormValue(request, "memo"))}</textarea>
       </label>
-      <button class="task-submit-btn" type="submit">요청등록</button>
+      <button class="task-submit-btn" type="submit">${editing && request?.status === "RETURNED" && request.requesterUserId === state.auth.employee?.id ? "수정 후 재요청" : editing ? "수정 저장" : "요청등록"}</button>
     </form>
+  `;
+}
+
+function renderTaskRequestDetail() {
+  const request = selectedWorkRequest();
+  if (!request) {
+    return `
+      ${renderTaskHeader("업무상세", "", "task-home", "뒤로")}
+      <section class="task-empty-card"><strong>업무를 찾을 수 없습니다.</strong></section>
+    `;
+  }
+
+  const canAssign = canHandleWorkRequests() && request.status === "WAITING";
+  const canReturn =
+    canHandleWorkRequests() &&
+    !["RETURNED", "COMPLETED"].includes(request.status) &&
+    (request.status !== "ASSIGNED" || request.assignedSecretaryId === state.auth.employee?.id);
+  const canComplete = canHandleWorkRequests() && request.status === "ASSIGNED" && request.assignedSecretaryId === state.auth.employee?.id;
+  const canEdit = canEditWorkRequest(request);
+  return `
+    ${renderTaskHeader("업무상세", workRequestTypeLabel(request.requestType), "task-home", "목록")}
+    <section class="work-detail-card status-${escapeHtml(request.status || "WAITING").toLowerCase()}">
+      <div class="work-request-head">
+        <div>
+          <span class="work-request-type">업무구분 · ${escapeHtml(workRequestTypeLabel(request.requestType))}</span>
+          <strong>${escapeHtml(request.customerName || "고객명 없음")}</strong>
+          <small>${escapeHtml(formatRequestDate(request.createdAt))}</small>
+        </div>
+        <span class="work-status">${escapeHtml(workRequestStatusLabel(request.status))}</span>
+      </div>
+      <dl class="work-detail-list">
+        <div><dt>등록회사명</dt><dd>${escapeHtml(request.companyName || "-")}</dd></div>
+        <div><dt>주민등록번호</dt><dd>${escapeHtml([request.rrnFront, request.rrnBack].filter(Boolean).join("-") || "-")}</dd></div>
+        <div><dt>연락처</dt><dd>${escapeHtml(phonePartsToLabel(request) || "-")}</dd></div>
+        <div><dt>주소</dt><dd>${escapeHtml([request.address, request.addressDetail].filter(Boolean).join(" ") || "-")}</dd></div>
+        <div><dt>직업</dt><dd>${escapeHtml(request.job || "-")}</dd></div>
+        <div><dt>운전여부</dt><dd>${escapeHtml(request.drivingType || "-")}</dd></div>
+        <div><dt>요청자</dt><dd>${escapeHtml(request.requesterName || "-")} ${request.requesterPhone ? `· ${escapeHtml(request.requesterPhone)}` : ""}</dd></div>
+        <div><dt>담당 비서</dt><dd>${escapeHtml(request.assignedSecretaryName || "-")} ${request.assignedSecretaryPhone ? `· ${escapeHtml(request.assignedSecretaryPhone)}` : ""}</dd></div>
+      </dl>
+      <div class="work-detail-memo">
+        <span>메모</span>
+        <p>${request.memo ? escapeHtml(request.memo) : "메모가 없습니다."}</p>
+      </div>
+      ${
+        canAssign || canReturn || canComplete || canEdit
+          ? `
+            <div class="work-detail-actions">
+              ${canAssign ? `<button class="btn primary" type="button" data-action="task-assign-request" data-request-id="${escapeHtml(request.id)}">접수하기</button>` : ""}
+              ${canReturn ? `<button class="btn secondary" type="button" data-action="task-return-request" data-request-id="${escapeHtml(request.id)}">반송</button>` : ""}
+              ${canComplete ? `<button class="btn primary" type="button" data-action="task-complete-request" data-request-id="${escapeHtml(request.id)}">완료하기</button>` : ""}
+              ${canEdit ? `<button class="btn secondary" type="button" data-action="task-edit-request" data-request-id="${escapeHtml(request.id)}">수정</button>` : ""}
+            </div>
+          `
+          : ""
+      }
+    </section>
   `;
 }
 
@@ -982,6 +1064,8 @@ function renderTaskRequestPage() {
   let content = "";
   if (state.taskView === "customer-company") content = renderTaskCompanySelect();
   else if (state.taskView === "customer-form") content = renderTaskCustomerForm();
+  else if (state.taskView === "request-detail") content = renderTaskRequestDetail();
+  else if (state.taskView === "request-edit") content = renderTaskCustomerForm(selectedWorkRequest());
   else if (state.taskView === "endorsement") content = renderTaskEndorsement();
   else content = renderTaskHome();
 
@@ -2610,6 +2694,7 @@ document.addEventListener("click", async (event) => {
     if (action === "task-home") {
       state.taskView = "home";
       state.taskSelectedCompany = null;
+      state.selectedWorkRequestId = "";
       renderTaskRequestPage();
     }
 
@@ -2639,6 +2724,18 @@ document.addEventListener("click", async (event) => {
       renderTaskRequestPage();
     }
 
+    if (action === "task-open-request") {
+      state.selectedWorkRequestId = target.dataset.requestId || state.selectedWorkRequestId;
+      state.taskView = "request-detail";
+      renderTaskRequestPage();
+    }
+
+    if (action === "task-edit-request") {
+      state.selectedWorkRequestId = target.dataset.requestId || state.selectedWorkRequestId;
+      state.taskView = "request-edit";
+      renderTaskRequestPage();
+    }
+
     if (action === "task-address-search") {
       showToast("주소검색은 다음 단계에서 연결합니다.");
     }
@@ -2653,8 +2750,22 @@ document.addEventListener("click", async (event) => {
         request_id_input: target.dataset.requestId
       });
       await loadWorkRequestState();
+      state.selectedWorkRequestId = target.dataset.requestId || state.selectedWorkRequestId;
+      state.taskView = "request-detail";
       renderTaskRequestPage();
       showToast("업무요청을 접수했습니다.");
+    }
+
+    if (action === "task-return-request") {
+      await callRpc("return_work_request", {
+        session_token_input: state.auth.token,
+        request_id_input: target.dataset.requestId
+      });
+      await loadWorkRequestState();
+      state.selectedWorkRequestId = target.dataset.requestId || state.selectedWorkRequestId;
+      state.taskView = "request-detail";
+      renderTaskRequestPage();
+      showToast("업무요청을 반송했습니다.");
     }
 
     if (action === "task-complete-request") {
@@ -2663,6 +2774,8 @@ document.addEventListener("click", async (event) => {
         request_id_input: target.dataset.requestId
       });
       await loadWorkRequestState();
+      state.selectedWorkRequestId = target.dataset.requestId || state.selectedWorkRequestId;
+      state.taskView = "request-detail";
       renderTaskRequestPage();
       showToast("업무요청을 완료했습니다.");
     }
@@ -2913,9 +3026,8 @@ document.addEventListener("submit", async (event) => {
     }
 
     if (form.dataset.form === "work-request") {
-      await callRpc("create_work_request", {
+      const requestArgs = {
         session_token_input: state.auth.token,
-        request_type_input: "CUSTOMER_REGISTRATION",
         company_name_input: data.companyName || "",
         customer_name_input: data.customerName || "",
         rrn_front_input: data.residentFront || "",
@@ -2928,12 +3040,22 @@ document.addEventListener("submit", async (event) => {
         job_input: data.job || "",
         driving_type_input: data.driving || "",
         memo_input: data.memo || ""
-      });
+      };
+      const savedRequest = form.dataset.requestId
+        ? await callRpc("update_work_request", {
+            ...requestArgs,
+            request_id_input: form.dataset.requestId
+          })
+        : await callRpc("create_work_request", {
+            ...requestArgs,
+            request_type_input: "CUSTOMER_REGISTRATION"
+          });
       await loadWorkRequestState();
-      state.taskView = "home";
+      state.selectedWorkRequestId = savedRequest?.id || form.dataset.requestId || "";
+      state.taskView = form.dataset.requestId ? "request-detail" : "home";
       state.taskSelectedCompany = null;
       renderTaskRequestPage();
-      showToast("업무요청이 등록되었습니다");
+      showToast(form.dataset.requestId ? "업무요청이 수정되었습니다" : "업무요청이 등록되었습니다");
     }
 
     if (form.dataset.form === "insurance-accounts") {

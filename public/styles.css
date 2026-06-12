@@ -3455,12 +3455,20 @@ button:disabled {
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
 }
 
+.work-request-card {
+  cursor: pointer;
+}
+
 .work-request-card.status-waiting {
   border-left: 4px solid #f59e0b;
 }
 
 .work-request-card.status-assigned {
   border-left: 4px solid #10b981;
+}
+
+.work-request-card.status-returned {
+  border-left: 4px solid #ef4444;
 }
 
 .work-request-card.status-completed {
@@ -3501,6 +3509,26 @@ button:disabled {
   color: #047857;
   font-size: 12px;
   font-weight: 900;
+}
+
+.status-waiting .work-status {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.status-assigned .work-status {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.status-returned .work-status {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.status-completed .work-status {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .work-request-meta {
@@ -3553,6 +3581,97 @@ button:disabled {
 
 .work-request-actions .btn {
   min-height: 42px;
+  border-radius: 12px;
+}
+
+.work-detail-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #e5eaf0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+}
+
+.work-detail-card.status-waiting {
+  border-top: 4px solid #f59e0b;
+}
+
+.work-detail-card.status-assigned {
+  border-top: 4px solid #10b981;
+}
+
+.work-detail-card.status-returned {
+  border-top: 4px solid #ef4444;
+}
+
+.work-detail-card.status-completed {
+  border-top: 4px solid #94a3b8;
+}
+
+.work-detail-list {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+
+.work-detail-list div {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.work-detail-list dt,
+.work-detail-list dd {
+  margin: 0;
+}
+
+.work-detail-list dt {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.work-detail-list dd {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.work-detail-memo {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.work-detail-memo span {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.work-detail-memo p {
+  margin: 0;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.work-detail-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.work-detail-actions .btn {
+  min-height: 44px;
   border-radius: 12px;
 }
 
