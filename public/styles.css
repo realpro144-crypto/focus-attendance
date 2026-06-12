@@ -647,6 +647,36 @@ button:disabled {
   border-radius: 9px;
 }
 
+.schedule-pill.official {
+  position: relative;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 58%, #f87171 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    0 4px 10px rgba(220, 38, 38, 0.2);
+}
+
+.schedule-pill.official::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 0%, rgba(255, 255, 255, 0.5) 48%, transparent 68%);
+  transform: translateX(-130%);
+  animation: official-schedule-gloss 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes official-schedule-gloss {
+  0%,
+  55% {
+    transform: translateX(-130%);
+  }
+
+  88%,
+  100% {
+    transform: translateX(130%);
+  }
+}
+
 .more {
   color: var(--muted);
   font-size: 11px;
@@ -1126,18 +1156,16 @@ button:disabled {
 
 .hero-account {
   position: absolute;
-  right: 4px;
-  bottom: 22px;
+  top: 8px;
+  right: 0;
   z-index: 2;
   display: grid;
   gap: 3px;
-  min-width: 86px;
-  max-width: 42%;
-  padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  background: rgba(3, 29, 43, 0.42);
-  backdrop-filter: blur(8px);
+  max-width: 46%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.28);
   text-align: right;
 }
 
@@ -2995,8 +3023,8 @@ button:disabled {
 
 .insurance-account-table th,
 .insurance-account-table td {
-  height: 74px;
-  padding: 7px 5px;
+  height: 59px;
+  padding: 5px 5px;
   border-bottom: 1px solid #edf1f5;
   color: #111827;
   font-size: 11.5px;
@@ -3090,8 +3118,8 @@ button:disabled {
 
 .insurance-table-input {
   width: 100%;
-  min-height: 36px;
-  padding: 7px 6px;
+  min-height: 30px;
+  padding: 5px 6px;
   border-radius: 10px;
   font-size: 12px;
   line-height: 1.25;
@@ -3102,11 +3130,14 @@ button:disabled {
   border-color: transparent;
   background: transparent;
   box-shadow: none;
+  outline: 0;
 }
 
 .insurance-table-input.empty-input:focus {
-  border-color: #dce3ea;
-  background: #ffffff;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  outline: 0;
 }
 
 .insurance-empty-row {
@@ -3125,7 +3156,7 @@ button:disabled {
 
   .insurance-account-table th,
   .insurance-account-table td {
-    height: 74px;
+    height: 59px;
     padding-right: 4px;
     padding-left: 4px;
     font-size: 10.5px;
@@ -3135,5 +3166,237 @@ button:disabled {
     padding-right: 5px;
     padding-left: 5px;
     font-size: 11px;
+  }
+}
+
+/* Task request page */
+.task-page {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.task-shell {
+  width: min(520px, 100%);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 0 16px 96px;
+}
+
+.task-header {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: 8px;
+  min-height: 72px;
+  margin: 0 -16px 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e5eaf0;
+  background: rgba(248, 250, 252, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.task-header h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 22px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.task-header p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.task-back-btn {
+  min-height: 40px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 900;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.task-card-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.task-menu-card,
+.task-empty-card,
+.task-company-card {
+  border: 1px solid #e5eaf0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+}
+
+.task-menu-card {
+  display: grid;
+  gap: 8px;
+  min-height: 104px;
+  padding: 20px;
+  text-align: left;
+}
+
+.task-menu-card strong,
+.task-empty-card strong {
+  color: #111827;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.task-menu-card span,
+.task-empty-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.task-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #eef2f6;
+}
+
+.task-tabs button {
+  min-height: 46px;
+  border-radius: 12px;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.task-tabs button.active {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.24);
+}
+
+.task-company-list {
+  display: grid;
+  gap: 10px;
+}
+
+.task-company-card {
+  min-height: 58px;
+  padding: 0 16px;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.25;
+  text-align: left;
+  word-break: keep-all;
+}
+
+.task-empty-card {
+  display: grid;
+  gap: 8px;
+  padding: 24px 20px;
+}
+
+.task-form {
+  display: grid;
+  gap: 14px;
+}
+
+.task-field,
+.task-fieldset {
+  display: grid;
+  gap: 7px;
+}
+
+.task-field span,
+.task-fieldset legend {
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.task-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.task-form .input,
+.task-form .select {
+  min-height: 48px;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.task-form textarea.input {
+  min-height: 96px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
+.task-split {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-split span {
+  color: #64748b;
+  font-weight: 900;
+  text-align: center;
+}
+
+.id-split {
+  grid-template-columns: minmax(0, 1fr) 10px minmax(0, 1fr);
+}
+
+.phone-split {
+  grid-template-columns: 64px 10px minmax(0, 1fr) 10px minmax(0, 1fr);
+}
+
+.task-split .input {
+  min-width: 0;
+  text-align: center;
+}
+
+.address-field > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 8px;
+}
+
+.address-field .btn {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.task-submit-btn {
+  min-height: 52px;
+  margin-top: 4px;
+  border-radius: 16px;
+  background: #10b981;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  box-shadow: 0 12px 24px rgba(16, 185, 129, 0.24);
+}
+
+@media (min-width: 720px) {
+  .task-shell {
+    padding-top: 10px;
   }
 }

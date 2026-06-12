@@ -15,6 +15,10 @@
     {
       "source": "/accounts",
       "destination": "/index.html"
+    },
+    {
+      "source": "/tasks",
+      "destination": "/index.html"
     }
   ]
 }

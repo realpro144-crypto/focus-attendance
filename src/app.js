@@ -108,6 +108,9 @@ let state = {
   accountSearchOpen: false,
   accountEditMode: false,
   accountEmployeeId: "",
+  taskView: "home",
+  taskCompanyTab: "LIFE",
+  taskSelectedCompany: null,
   authMode: "login",
   auth: { status: "checking", token: "", employee: null },
   savedLogin: { employeeNo: "", password: "", rememberCredentials: false, autoLogin: false },
@@ -140,12 +143,13 @@ export function startApp(rootElement) {
 const route = () => {
   if (window.location.pathname === "/calendar") return "calendar";
   if (window.location.pathname === "/accounts") return "accounts";
+  if (window.location.pathname === "/tasks") return "tasks";
   if (window.location.pathname === "/checkin") return "checkin";
   return "dashboard";
 };
 const isCheckinRoute = () => route() === "checkin";
 const isAccountsRoute = () => route() === "accounts";
-const isEmployeeRoute = () => ["checkin", "calendar", "accounts"].includes(route());
+const isEmployeeRoute = () => ["checkin", "calendar", "accounts", "tasks"].includes(route());
 const isAdminRoute = () => route() === "dashboard";
 
 const escapeHtml = (value) =>
@@ -355,6 +359,7 @@ function normalizedScheduleColor(value) {
 }
 
 function scheduleColor(schedule) {
+  if (schedule?.isOfficial) return "#EF4444";
   return normalizedScheduleColor(schedule?.color) || scheduleTypeMeta(schedule?.type).color || defaultScheduleColor;
 }
 
@@ -732,6 +737,156 @@ function renderInsuranceAccountsPage() {
   `;
 }
 
+function taskCompanyRows() {
+  return (insuranceCompanies[state.taskCompanyTab] || []).map((company) => ({
+    type: state.taskCompanyTab,
+    company
+  }));
+}
+
+function taskCompanyById(type, id) {
+  return (insuranceCompanies[type] || []).find((company) => company.id === id) || null;
+}
+
+function renderTaskHeader(title, subtitle = "", backAction = "go-home", backLabel = "홈") {
+  return `
+    <header class="task-header">
+      <button class="task-back-btn" type="button" data-action="${backAction}">${escapeHtml(backLabel)}</button>
+      <div>
+        <h1>${escapeHtml(title)}</h1>
+        ${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ""}
+      </div>
+      <span></span>
+    </header>
+  `;
+}
+
+function renderTaskHome() {
+  return `
+    ${renderTaskHeader("업무요청", "필요한 업무를 선택하세요")}
+    <section class="task-card-grid">
+      <button class="task-menu-card" type="button" data-action="task-open-customer">
+        <strong>고객등록</strong>
+        <span>보험회사 선택 후 고객 정보를 입력합니다.</span>
+      </button>
+      <button class="task-menu-card" type="button" data-action="task-open-endorsement">
+        <strong>배서요청</strong>
+        <span>배서요청 화면은 준비 중입니다.</span>
+      </button>
+    </section>
+  `;
+}
+
+function renderTaskCompanySelect() {
+  const rows = taskCompanyRows();
+  return `
+    ${renderTaskHeader("고객등록", "등록할 보험회사를 선택하세요", "task-home", "뒤로")}
+    <div class="task-tabs" role="tablist" aria-label="보험사 구분">
+      <button type="button" class="${state.taskCompanyTab === "LIFE" ? "active" : ""}" data-action="task-company-tab" data-tab="LIFE">생명보험</button>
+      <button type="button" class="${state.taskCompanyTab === "NONLIFE" ? "active" : ""}" data-action="task-company-tab" data-tab="NONLIFE">손해보험</button>
+    </div>
+    <section class="task-company-list">
+      ${rows
+        .map(
+          ({ type, company }) => `
+            <button class="task-company-card" type="button" data-action="task-select-company" data-company-type="${type}" data-company-id="${escapeHtml(company.id)}">
+              ${insuranceCompanyNameHtml(company.name)}
+            </button>
+          `
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function renderTaskCustomerForm() {
+  const selected = state.taskSelectedCompany || { type: state.taskCompanyTab, company: insuranceCompanies[state.taskCompanyTab][0] };
+  const companyName = selected.company?.name || "";
+  return `
+    ${renderTaskHeader("고객등록", companyName, "task-open-customer", "뒤로")}
+    <form class="task-form">
+      <label class="task-field">
+        <span>등록회사명</span>
+        <input class="input" value="${escapeHtml(companyName)}" readonly />
+      </label>
+      <label class="task-field">
+        <span>고객명</span>
+        <input class="input" name="customerName" autocomplete="off" placeholder="고객명을 입력하세요" />
+      </label>
+      <fieldset class="task-fieldset">
+        <legend>주민등록번호</legend>
+        <div class="task-split id-split">
+          <input class="input" name="residentFront" inputmode="numeric" maxlength="6" data-digits-only data-max-length="6" data-focus-next="residentBack" placeholder="앞 6자리" />
+          <span>-</span>
+          <input class="input" name="residentBack" inputmode="numeric" maxlength="7" data-digits-only data-max-length="7" placeholder="뒤 7자리" />
+        </div>
+      </fieldset>
+      <fieldset class="task-fieldset">
+        <legend>연락처</legend>
+        <div class="task-split phone-split">
+          <input class="input" name="phoneFirst" inputmode="numeric" maxlength="3" value="010" data-digits-only data-max-length="3" data-focus-next="phoneMiddle" />
+          <span>-</span>
+          <input class="input" name="phoneMiddle" inputmode="numeric" maxlength="4" data-digits-only data-max-length="4" data-focus-next="phoneLast" placeholder="0000" />
+          <span>-</span>
+          <input class="input" name="phoneLast" inputmode="numeric" maxlength="4" data-digits-only data-max-length="4" placeholder="0000" />
+        </div>
+      </fieldset>
+      <label class="task-field address-field">
+        <span>주소</span>
+        <div>
+          <input class="input" name="address" autocomplete="off" placeholder="주소를 입력하세요" />
+          <button class="btn secondary" type="button" data-action="task-address-search">주소검색</button>
+        </div>
+      </label>
+      <label class="task-field">
+        <span>직업</span>
+        <input class="input" name="job" autocomplete="off" placeholder="직업을 입력하세요" />
+      </label>
+      <label class="task-field">
+        <span>운전여부</span>
+        <select class="select" name="driving">
+          <option>운전안함</option>
+          <option>승용차(자가용)</option>
+          <option>승용차(영업용)</option>
+          <option>화물차(개인용)</option>
+          <option>화물차(영업용)</option>
+        </select>
+      </label>
+      <label class="task-field">
+        <span>메모</span>
+        <textarea class="input" name="memo" rows="4" placeholder="메모를 입력하세요"></textarea>
+      </label>
+      <button class="task-submit-btn" type="button" data-action="task-submit-request">요청등록</button>
+    </form>
+  `;
+}
+
+function renderTaskEndorsement() {
+  return `
+    ${renderTaskHeader("배서요청", "화면 준비 중입니다", "task-home", "뒤로")}
+    <section class="task-empty-card">
+      <strong>배서요청</strong>
+      <p>요청 입력 화면은 다음 단계에서 추가할 수 있습니다.</p>
+    </section>
+  `;
+}
+
+function renderTaskRequestPage() {
+  let content = "";
+  if (state.taskView === "customer-company") content = renderTaskCompanySelect();
+  else if (state.taskView === "customer-form") content = renderTaskCustomerForm();
+  else if (state.taskView === "endorsement") content = renderTaskEndorsement();
+  else content = renderTaskHome();
+
+  app.innerHTML = `
+    <div class="task-page">
+      <main class="task-shell">
+        ${state.auth.employee ? content : renderAuthPanel()}
+      </main>
+    </div>
+  `;
+}
+
 function captureScheduleDraft() {
   const form = document.querySelector('[data-form="schedule"]');
   if (!form) return null;
@@ -986,6 +1141,9 @@ function clearSession() {
   state.accountEditMode = false;
   state.accountEmployeeId = "";
   state.selectedAccountRowKey = "";
+  state.taskView = "home";
+  state.taskCompanyTab = "LIFE";
+  state.taskSelectedCompany = null;
 }
 
 function renderTopbar() {
@@ -995,6 +1153,7 @@ function renderTopbar() {
       <button class="btn secondary" data-action="refresh">새로고침</button>
       <button class="btn secondary" data-action="go-home">출근 화면</button>
       <button class="btn secondary" data-action="open-accounts">사번/비밀번호</button>
+      <button class="btn secondary" data-action="open-tasks">업무요청</button>
       <button class="btn secondary" data-action="logout">로그아웃</button>
     `
     : isCheckinRoute()
@@ -1789,6 +1948,7 @@ function renderCheckinActions() {
       ${isAdminEmployee() ? `<button class="btn secondary wide" data-action="open-admin">관리자 페이지</button>` : ""}
       <button class="btn secondary wide" data-action="open-calendar">캘린더</button>
       <button class="btn secondary wide" data-action="open-accounts">사번/비밀번호</button>
+      <button class="btn secondary wide" data-action="open-tasks">업무요청</button>
       <button class="logout-link" data-action="logout">로그아웃</button>
     </div>
   `;
@@ -1897,6 +2057,7 @@ function renderEmployeeCalendarPage() {
 function render() {
   if (route() === "calendar") renderEmployeeCalendarPage();
   else if (route() === "accounts") renderInsuranceAccountsPage();
+  else if (route() === "tasks") renderTaskRequestPage();
   else if (route() === "checkin") renderCheckin();
   else renderDashboard();
 }
@@ -2260,7 +2421,7 @@ document.addEventListener("click", async (event) => {
     if (action === "logout") {
       await stopScanner({ rerender: false });
       clearSession();
-      if (route() === "calendar" || route() === "dashboard" || route() === "accounts") window.history.pushState({}, "", "/checkin");
+      if (route() === "calendar" || route() === "dashboard" || route() === "accounts" || route() === "tasks") window.history.pushState({}, "", "/checkin");
       render();
     }
 
@@ -2279,6 +2440,15 @@ document.addEventListener("click", async (event) => {
       renderInsuranceAccountsPage();
     }
 
+    if (action === "open-tasks") {
+      window.history.pushState({}, "", "/tasks");
+      state.taskView = "home";
+      state.taskCompanyTab = "LIFE";
+      state.taskSelectedCompany = null;
+      await loadState({ keepCheckIn: true });
+      renderTaskRequestPage();
+    }
+
     if (action === "open-admin") {
       window.history.pushState({}, "", "/dashboard");
       await loadState();
@@ -2288,6 +2458,46 @@ document.addEventListener("click", async (event) => {
     if (action === "go-home") {
       window.history.pushState({}, "", "/checkin");
       renderCheckin();
+    }
+
+    if (action === "task-home") {
+      state.taskView = "home";
+      state.taskSelectedCompany = null;
+      renderTaskRequestPage();
+    }
+
+    if (action === "task-open-customer") {
+      state.taskView = "customer-company";
+      state.taskSelectedCompany = null;
+      renderTaskRequestPage();
+    }
+
+    if (action === "task-open-endorsement") {
+      state.taskView = "endorsement";
+      renderTaskRequestPage();
+    }
+
+    if (action === "task-company-tab") {
+      state.taskCompanyTab = target.dataset.tab || "LIFE";
+      renderTaskRequestPage();
+    }
+
+    if (action === "task-company-select") {
+      const type = target.dataset.companyType || state.taskCompanyTab;
+      const company = taskCompanyById(type, target.dataset.companyId);
+      if (!company) return;
+      state.taskCompanyTab = type;
+      state.taskSelectedCompany = { type, company };
+      state.taskView = "customer-form";
+      renderTaskRequestPage();
+    }
+
+    if (action === "task-address-search") {
+      showToast("주소검색은 다음 단계에서 연결합니다.");
+    }
+
+    if (action === "task-submit-request") {
+      showToast("요청등록 화면이 준비되었습니다. 저장 기능은 다음 단계에서 연결합니다.");
     }
 
     if (action === "account-tab") {
@@ -2389,6 +2599,11 @@ document.addEventListener("input", (event) => {
     event.target.value = event.target.value.replace(/\D/g, "").slice(0, maxLength);
     event.target.setCustomValidity("");
 
+    if (event.target.dataset.focusNext && event.target.value.length === maxLength) {
+      const form = event.target.closest("form");
+      form?.elements[event.target.dataset.focusNext]?.focus();
+    }
+
     const form = event.target.closest('form[data-form="register"]');
     if (form && event.target.name === "birthDate") {
       const error = form.querySelector("[data-birth-date-error]");
@@ -2400,6 +2615,10 @@ document.addEventListener("input", (event) => {
     if (form && event.target.name === "employeeNo" && event.target.value.length === 8) {
       form.elements.password?.focus();
     }
+  }
+
+  if (event.target.classList.contains("insurance-table-input")) {
+    event.target.classList.toggle("empty-input", !event.target.value.trim());
   }
 
   if (event.target.dataset.action === "calendar-search-input") {
@@ -2430,7 +2649,7 @@ document.addEventListener("input", (event) => {
 });
 
 document.addEventListener("focusin", (event) => {
-  const field = event.target.closest(".schedule-form input, .schedule-form textarea, .insurance-form input");
+  const field = event.target.closest(".schedule-form input, .schedule-form textarea, .insurance-form input, .task-form input, .task-form textarea, .task-form select");
   if (!field) return;
   window.setTimeout(() => field.scrollIntoView({ block: "center", behavior: "smooth" }), 120);
 });
