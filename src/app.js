@@ -85,6 +85,10 @@ let state = {
   insuranceAccounts: [],
   insuranceCanManageAll: false,
   insuranceAccountError: "",
+  workRequests: [],
+  workRequestCanManageAll: false,
+  workRequestCanHandle: false,
+  workRequestError: "",
   today: null,
   checkInUrl: "",
   wallQrUrl: "",
@@ -315,6 +319,10 @@ function employeeById(employeeId) {
 
 function isAdminEmployee(employee = state.auth.employee) {
   return Boolean(employee?.isAdmin);
+}
+
+function isSecretaryEmployee(employee = state.auth.employee) {
+  return Boolean(employee?.isSecretary);
 }
 
 function filteredRecords() {
@@ -550,6 +558,37 @@ function currentInsuranceRows() {
   return source.filter(({ company }) => company.name.toLowerCase().includes(query));
 }
 
+function canManageWorkRequests() {
+  return Boolean(state.workRequestCanManageAll || isAdminEmployee() || isSecretaryEmployee());
+}
+
+function canHandleWorkRequests() {
+  return Boolean(state.workRequestCanHandle || isSecretaryEmployee());
+}
+
+function workRequestStatusLabel(status) {
+  const labels = {
+    WAITING: "대기",
+    ASSIGNED: "접수",
+    COMPLETED: "완료"
+  };
+  return labels[status] || status || "대기";
+}
+
+function workRequestTypeLabel(type) {
+  return type === "ENDORSEMENT" ? "배서요청" : "고객등록";
+}
+
+function phonePartsToLabel(request) {
+  return [request.phone1, request.phone2, request.phone3].filter(Boolean).join("-");
+}
+
+function employeeRoleValue(employee) {
+  if (employee?.isAdmin) return "admin";
+  if (employee?.isSecretary) return "secretary";
+  return "member";
+}
+
 function insuranceCompanyNameHtml(name) {
   const breakMap = {
     "NH농협손해보험": "NH농협<wbr>손해보험",
@@ -748,6 +787,69 @@ function taskCompanyById(type, id) {
   return (insuranceCompanies[type] || []).find((company) => company.id === id) || null;
 }
 
+function renderWorkRequestCard(request) {
+  const isManager = canManageWorkRequests();
+  const assigned = request.assignedSecretaryName || request.assignedSecretaryPhone;
+  const canAssign = canHandleWorkRequests() && request.status === "WAITING";
+  const canComplete = canHandleWorkRequests() && request.status === "ASSIGNED" && request.assignedSecretaryId === state.auth.employee?.id;
+
+  return `
+    <article class="work-request-card status-${escapeHtml(request.status || "WAITING").toLowerCase()}">
+      <div class="work-request-head">
+        <div>
+          <span class="work-request-type">${escapeHtml(workRequestTypeLabel(request.requestType))}</span>
+          <strong>${escapeHtml(request.customerName || "고객명 없음")}</strong>
+        </div>
+        <span class="work-status">${escapeHtml(workRequestStatusLabel(request.status))}</span>
+      </div>
+      <dl class="work-request-meta">
+        <div><dt>회사</dt><dd>${escapeHtml(request.companyName || "-")}</dd></div>
+        <div><dt>연락처</dt><dd>${escapeHtml(phonePartsToLabel(request) || "-")}</dd></div>
+        <div><dt>주소</dt><dd>${escapeHtml([request.address, request.addressDetail].filter(Boolean).join(" ") || "-")}</dd></div>
+        ${isManager ? `<div><dt>요청자</dt><dd>${escapeHtml(request.requesterName || "-")} ${request.requesterPhone ? `· ${escapeHtml(request.requesterPhone)}` : ""}</dd></div>` : ""}
+        ${assigned ? `<div><dt>담당 비서</dt><dd>${escapeHtml(request.assignedSecretaryName || "-")} ${request.assignedSecretaryPhone ? `· ${escapeHtml(request.assignedSecretaryPhone)}` : ""}</dd></div>` : ""}
+      </dl>
+      ${request.memo ? `<p class="work-request-memo">${escapeHtml(request.memo)}</p>` : ""}
+      ${
+        canAssign || canComplete
+          ? `
+            <div class="work-request-actions">
+              ${canAssign ? `<button class="btn primary" type="button" data-action="task-assign-request" data-request-id="${escapeHtml(request.id)}">접수하기</button>` : ""}
+              ${canComplete ? `<button class="btn secondary" type="button" data-action="task-complete-request" data-request-id="${escapeHtml(request.id)}">완료하기</button>` : ""}
+            </div>
+          `
+          : ""
+      }
+    </article>
+  `;
+}
+
+function renderWorkRequestList() {
+  if (state.workRequestError) {
+    return `
+      <section class="work-request-list">
+        <h2>업무목록</h2>
+        <div class="task-error-card">${escapeHtml(state.workRequestError)}</div>
+      </section>
+    `;
+  }
+
+  const requests = [...(state.workRequests || [])].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  return `
+    <section class="work-request-list">
+      <div class="work-request-list-title">
+        <h2>업무목록</h2>
+        <span>${requests.length}건</span>
+      </div>
+      ${
+        requests.length
+          ? requests.map((request) => renderWorkRequestCard(request)).join("")
+          : `<div class="task-empty-card"><strong>등록된 업무가 없습니다.</strong><p>고객등록을 눌러 새 요청을 등록할 수 있습니다.</p></div>`
+      }
+    </section>
+  `;
+}
+
 function renderTaskHeader(title, subtitle = "", backAction = "go-home", backLabel = "홈") {
   return `
     <header class="task-header">
@@ -774,6 +876,7 @@ function renderTaskHome() {
         <span>배서요청 화면은 준비 중입니다.</span>
       </button>
     </section>
+    ${renderWorkRequestList()}
   `;
 }
 
@@ -804,21 +907,21 @@ function renderTaskCustomerForm() {
   const companyName = selected.company?.name || "";
   return `
     ${renderTaskHeader("고객등록", companyName, "task-open-customer", "뒤로")}
-    <form class="task-form">
+    <form class="task-form" data-form="work-request">
       <label class="task-field">
         <span>등록회사명</span>
-        <input class="input" value="${escapeHtml(companyName)}" readonly />
+        <input class="input" name="companyName" value="${escapeHtml(companyName)}" readonly />
       </label>
       <label class="task-field">
         <span>고객명</span>
-        <input class="input" name="customerName" autocomplete="off" placeholder="고객명을 입력하세요" />
+        <input class="input" name="customerName" autocomplete="off" placeholder="고객명을 입력하세요" required />
       </label>
       <fieldset class="task-fieldset">
         <legend>주민등록번호</legend>
         <div class="task-split id-split">
-          <input class="input" name="residentFront" inputmode="numeric" maxlength="6" data-digits-only data-max-length="6" data-focus-next="residentBack" placeholder="앞 6자리" />
+          <input class="input" name="residentFront" inputmode="numeric" maxlength="6" minlength="6" pattern="\\d{6}" data-digits-only data-max-length="6" data-focus-next="residentBack" placeholder="앞 6자리" required />
           <span>-</span>
-          <input class="input" name="residentBack" inputmode="numeric" maxlength="7" data-digits-only data-max-length="7" placeholder="뒤 7자리" />
+          <input class="input" name="residentBack" inputmode="numeric" maxlength="7" minlength="7" pattern="\\d{7}" data-digits-only data-max-length="7" placeholder="뒤 7자리" required />
         </div>
       </fieldset>
       <fieldset class="task-fieldset">
@@ -839,6 +942,10 @@ function renderTaskCustomerForm() {
         </div>
       </label>
       <label class="task-field">
+        <span>상세주소</span>
+        <input class="input" name="addressDetail" autocomplete="off" placeholder="상세주소를 입력하세요" />
+      </label>
+      <label class="task-field">
         <span>직업</span>
         <input class="input" name="job" autocomplete="off" placeholder="직업을 입력하세요" />
       </label>
@@ -856,7 +963,7 @@ function renderTaskCustomerForm() {
         <span>메모</span>
         <textarea class="input" name="memo" rows="4" placeholder="메모를 입력하세요"></textarea>
       </label>
-      <button class="task-submit-btn" type="button" data-action="task-submit-request">요청등록</button>
+      <button class="task-submit-btn" type="submit">요청등록</button>
     </form>
   `;
 }
@@ -1003,6 +1110,29 @@ async function loadInsuranceAccountState() {
   }
 }
 
+async function loadWorkRequestState() {
+  if (!state.auth.employee) return;
+
+  try {
+    const payload = await callRpc("get_work_request_state", {
+      session_token_input: state.auth.token
+    });
+    state = {
+      ...state,
+      workRequests: payload.workRequests ?? [],
+      workRequestCanManageAll: Boolean(payload.canManageWorkRequests),
+      workRequestCanHandle: Boolean(payload.canHandleWorkRequests),
+      workRequestError: "",
+      employees: payload.employees ?? state.employees
+    };
+  } catch (error) {
+    state.workRequests = [];
+    state.workRequestCanManageAll = false;
+    state.workRequestCanHandle = false;
+    state.workRequestError = `업무요청 기능 SQL을 Supabase에 먼저 적용해 주세요. ${error.message}`;
+  }
+}
+
 async function loadState({ keepCheckIn = false } = {}) {
   let payload;
   if (isEmployeeRoute()) {
@@ -1077,6 +1207,10 @@ async function loadState({ keepCheckIn = false } = {}) {
   if ((isAccountsRoute() || (isAdminRoute() && isAdminEmployee())) && state.auth.employee) {
     await loadInsuranceAccountState();
   }
+
+  if (route() === "tasks" && state.auth.employee) {
+    await loadWorkRequestState();
+  }
 }
 
 async function loadAuth() {
@@ -1131,6 +1265,10 @@ function clearSession() {
   state.insuranceAccounts = [];
   state.insuranceCanManageAll = false;
   state.insuranceAccountError = "";
+  state.workRequests = [];
+  state.workRequestCanManageAll = false;
+  state.workRequestCanHandle = false;
+  state.workRequestError = "";
   state.daySheetOpen = false;
   state.scheduleEditorMode = "";
   state.selectedScheduleId = "";
@@ -1238,6 +1376,7 @@ function renderEmployeesPanel() {
                             <span class="employee-name">
                               ${escapeHtml(employee.name)}
                               ${employee.isAdmin ? `<em class="admin-chip">관리자</em>` : ""}
+                              ${employee.isSecretary ? `<em class="admin-chip secretary-chip">비서</em>` : ""}
                             </span>
                             <span class="employee-meta">${escapeHtml(employeeNoLabel(employee.employeeNo))}</span>
                             <span class="employee-private-meta">
@@ -1246,6 +1385,14 @@ function renderEmployeesPanel() {
                           </span>
                         </div>
                         <div class="employee-admin-actions">
+                          <label class="role-select-field">
+                            <span>권한</span>
+                            <select class="select" data-action="employee-role" data-employee-id="${escapeHtml(employee.id)}" ${isSelf ? "disabled" : ""}>
+                              <option value="member"${employeeRoleValue(employee) === "member" ? " selected" : ""}>member</option>
+                              <option value="secretary"${employeeRoleValue(employee) === "secretary" ? " selected" : ""}>secretary</option>
+                              <option value="admin"${employeeRoleValue(employee) === "admin" ? " selected" : ""}>admin</option>
+                            </select>
+                          </label>
                           <form class="password-reset-form" data-form="employee-password" data-employee-id="${escapeHtml(employee.id)}">
                             <input class="input" name="password" type="password" minlength="4" placeholder="새 비밀번호" autocomplete="new-password" required />
                             <button class="btn secondary" type="submit">비밀번호 변경</button>
@@ -2500,6 +2647,26 @@ document.addEventListener("click", async (event) => {
       showToast("요청등록 화면이 준비되었습니다. 저장 기능은 다음 단계에서 연결합니다.");
     }
 
+    if (action === "task-assign-request") {
+      await callRpc("assign_work_request", {
+        session_token_input: state.auth.token,
+        request_id_input: target.dataset.requestId
+      });
+      await loadWorkRequestState();
+      renderTaskRequestPage();
+      showToast("업무요청을 접수했습니다.");
+    }
+
+    if (action === "task-complete-request") {
+      await callRpc("complete_work_request", {
+        session_token_input: state.auth.token,
+        request_id_input: target.dataset.requestId
+      });
+      await loadWorkRequestState();
+      renderTaskRequestPage();
+      showToast("업무요청을 완료했습니다.");
+    }
+
     if (action === "account-tab") {
       state.accountTab = target.dataset.tab || "LIFE";
       state.selectedAccountRowKey = "";
@@ -2589,6 +2756,21 @@ document.addEventListener("change", async (event) => {
     state.accountSearchOpen = false;
     state.selectedAccountRowKey = "";
     renderInsuranceAccountsPage();
+  }
+
+  if (event.target.dataset.action === "employee-role") {
+    try {
+      await callRpc("set_employee_role", {
+        session_token_input: state.auth.token,
+        employee_id_input: event.target.dataset.employeeId,
+        role_input: event.target.value
+      });
+      await refresh();
+      showToast("지점원 권한을 변경했습니다.");
+    } catch (error) {
+      showToast(error.message);
+      await refresh();
+    }
   }
 
 });
@@ -2728,6 +2910,30 @@ document.addEventListener("submit", async (event) => {
       state.daySheetOpen = true;
       await refresh({ keepCheckIn: route() === "checkin" });
       showToast("일정이 저장되었습니다");
+    }
+
+    if (form.dataset.form === "work-request") {
+      await callRpc("create_work_request", {
+        session_token_input: state.auth.token,
+        request_type_input: "CUSTOMER_REGISTRATION",
+        company_name_input: data.companyName || "",
+        customer_name_input: data.customerName || "",
+        rrn_front_input: data.residentFront || "",
+        rrn_back_input: data.residentBack || "",
+        phone1_input: data.phoneFirst || "",
+        phone2_input: data.phoneMiddle || "",
+        phone3_input: data.phoneLast || "",
+        address_input: data.address || "",
+        address_detail_input: data.addressDetail || "",
+        job_input: data.job || "",
+        driving_type_input: data.driving || "",
+        memo_input: data.memo || ""
+      });
+      await loadWorkRequestState();
+      state.taskView = "home";
+      state.taskSelectedCompany = null;
+      renderTaskRequestPage();
+      showToast("업무요청이 등록되었습니다");
     }
 
     if (form.dataset.form === "insurance-accounts") {

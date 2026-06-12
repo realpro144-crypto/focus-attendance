@@ -367,6 +367,29 @@ button:disabled {
   vertical-align: 1px;
 }
 
+.secretary-chip {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.role-select-field {
+  display: grid;
+  gap: 5px;
+}
+
+.role-select-field span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.role-select-field .select {
+  min-height: 38px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .employee-private-meta {
   display: block;
   margin-top: 3px;
@@ -3393,6 +3416,151 @@ button:disabled {
   font-size: 16px;
   font-weight: 900;
   box-shadow: 0 12px 24px rgba(16, 185, 129, 0.24);
+}
+
+.work-request-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.work-request-list h2,
+.work-request-list-title h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.work-request-list-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.work-request-list-title span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.work-request-card,
+.task-error-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #e5eaf0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+}
+
+.work-request-card.status-waiting {
+  border-left: 4px solid #f59e0b;
+}
+
+.work-request-card.status-assigned {
+  border-left: 4px solid #10b981;
+}
+
+.work-request-card.status-completed {
+  border-left: 4px solid #94a3b8;
+  opacity: 0.82;
+}
+
+.work-request-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.work-request-head div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.work-request-head strong {
+  color: #111827;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.work-request-type {
+  color: #10b981;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.work-status {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.work-request-meta {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.work-request-meta div {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.work-request-meta dt,
+.work-request-meta dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.work-request-meta dt {
+  color: #94a3b8;
+  font-weight: 900;
+}
+
+.work-request-meta dd {
+  color: #334155;
+  font-weight: 800;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.work-request-memo {
+  margin: 0;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.work-request-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.work-request-actions .btn {
+  min-height: 42px;
+  border-radius: 12px;
+}
+
+.task-error-card {
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 @media (min-width: 720px) {
